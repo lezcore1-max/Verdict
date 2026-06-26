@@ -141,12 +141,12 @@ def _formal_ttest(
             # Significant outlier! Too surprising, warranting skepticism.
             directionality = "inconclusive"
             strength = "weak"
-            eval_note = f"Claimed score {claimed_score} is a statistical outlier relative to the leaderboard (p={p_val:.3f}). Warrants further verification."
+            eval_note = f"Claimed score {claimed_score} for '{sub_hyp_text}' is a statistical outlier relative to the leaderboard (p={p_val:.3f}). Warrants further verification."
         else:
             # Plausible claim. Higher p-value = more consistent with known data.
             directionality = "supporting"
             strength = "strong" if p_val > 0.5 else "moderate" if p_val > 0.1 else "weak"
-            eval_note = f"Claimed score {claimed_score} is consistent with the known leaderboard distribution."
+            eval_note = f"Claimed score {claimed_score} for '{sub_hyp_text}' is consistent with the known leaderboard distribution."
 
         return JudgedEvidence(
             directly_tests=True,
