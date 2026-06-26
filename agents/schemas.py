@@ -123,6 +123,10 @@ class JudgedEvidence(BaseModel):
             '"approximate" = LLM-estimated proxy.'
         ),
     )
+    eval_note: Optional[str] = Field(
+        default=None,
+        description="Optional explanatory note regarding the statistical inference.",
+    )
 
     @model_validator(mode="after")
     def clamp_p_value(self) -> "JudgedEvidence":

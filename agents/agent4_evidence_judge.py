@@ -133,24 +133,28 @@ def _formal_ttest(
             return None  # Not enough data for a meaningful t-test
 
         # One-sample t-test: is the claimed_score consistent with leaderboard distribution?
-        # alternative="less" tests if the true mean is less than claimed_score,
-        # i.e., whether claimed_score is above the leaderboard mean.
-        result = scipy_stats.ttest_1samp(scores, popmean=claimed_score, alternative="less")
+        # A two-sided test will detect if the claimed_score is an outlier in either direction.
+        result = scipy_stats.ttest_1samp(scores, popmean=claimed_score, alternative="two-sided")
         p_val = max(float(result.pvalue), P_VALUE_FLOOR)
 
-        leaderboard_mean = float(scores.mean())
-
-        if claimed_score > leaderboard_mean:
-            directionality = "supporting"
+        if p_val < 0.05:
+            # Significant outlier! Too surprising, warranting skepticism.
+            directionality = "inconclusive"
+            strength = "weak"
+            eval_note = f"Claimed score {claimed_score} is a statistical outlier relative to the leaderboard (p={p_val:.3f}). Warrants further verification."
         else:
-            directionality = "contradicting"
+            # Plausible claim. Higher p-value = more consistent with known data.
+            directionality = "supporting"
+            strength = "strong" if p_val > 0.5 else "moderate" if p_val > 0.1 else "weak"
+            eval_note = f"Claimed score {claimed_score} is consistent with the known leaderboard distribution."
 
         return JudgedEvidence(
             directly_tests=True,
             directionality=directionality,
-            strength="strong" if p_val < 0.05 else "moderate" if p_val < 0.2 else "weak",
+            strength=strength,
             p_value=p_val,
             p_value_tag="formal",
+            eval_note=eval_note,
         )
     except Exception as exc:
         logger.warning("Formal t-test failed: %s", exc)
