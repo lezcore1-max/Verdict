@@ -53,5 +53,5 @@ VERDICT requires two API keys to function:
    TAVILY_API_KEY="your_tavily_key_here"
    ```
 
-## 🛡️ API Safeguards
+##  API Safeguards
 The system is hard-capped with a strict 4.1-second delay between Gemini API calls to ensure it mathematically respects the free-tier limit of 15 Requests Per Minute (RPM), preventing quota exhaustion during deep multi-agent debates.
