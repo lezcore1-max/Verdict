@@ -2,7 +2,7 @@
 
 VERDICT is a powerful, multi-agent AI pipeline designed to extract, decompose, and mathematically verify falsifiable claims from dense scientific literature and text. Built with Streamlit and powered by Gemini 3.1 Flash Lite, it utilizes an advanced system of 6 specialized AI agents to rigorously debate and judge claims using the **Dempster-Shafer Theory** and the **Sequential Probability Ratio Test (SPRT)**.
 
-## 🤖 The 6-Agent Pipeline
+##  The 6-Agent Pipeline
 
 The system breaks down complex cognitive reasoning into specialized roles:
 1. **Agent 1 (Claim Extractor):** Reads the source document and extracts structured, falsifiable claims, tracking logical dependencies between them.
@@ -11,14 +11,14 @@ The system breaks down complex cognitive reasoning into specialized roles:
 4. **Agent 4 (Evidence Judge):** Rigorously evaluates the found evidence and assigns a statistical p-value representing its strength and relevance.
 5. **Agent 5 (Devil's Advocate):** Specifically searches for evidence that *contradicts* the claim to ensure unbiased evaluation.
 6. **Agent 6 (Verdict Synthesizer):** Aggregates the mathematical probabilities, resolves inter-agent disagreement, and writes a nuanced, final verdict (Support, Contradiction, or Uncertainty).
-
-## 📊 The Math Behind the Magic
+   
+##  The Math Behind the Magic
 
 Instead of relying on LLM hallucination, VERDICT proves its conclusions mathematically:
 * **Dempster-Shafer Theory (DST):** Explicitly models *uncertainty*. Instead of a simple "true/false", the system maintains dynamic probabilities for Support, Contradiction, and Uncertainty.
 * **Sequential Probability Ratio Test (SPRT):** Calculates a running likelihood ratio as evidence rolls in, guaranteeing statistically significant conclusions and preventing the system from over-analyzing claims that are already proven.
 
-## 🚀 Setup & Deployment
+##  Setup & Deployment
 
 VERDICT requires two API keys to function:
 - `GEMINI_API_KEY`: For the LLM reasoning (Gemini 3.1 Flash Lite).
