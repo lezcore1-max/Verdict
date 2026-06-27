@@ -204,7 +204,7 @@ def get_pwc_leaderboard(task: str, dataset: str, metric: str) -> Optional[list[d
         return None
 
     try:
-        with httpx.Client(timeout=20) as client:
+        with httpx.Client(timeout=20, follow_redirects=True) as client:
             params = {}
             if task: params["task"] = task
             if dataset: params["dataset"] = dataset

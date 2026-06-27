@@ -197,14 +197,10 @@ def _persist_results(
     verdict = state.get("final_verdict") or {}
     plain = verdict.get("plain_language", "Pipeline did not produce a verdict.")
 
-    if verdict and verdict.get("support") is not None:
-        support = float(verdict["support"])
-        contradiction = float(verdict["contradiction"])
-        uncertainty = float(verdict["uncertainty"])
-    else:
-        support = float(claim_triplet[0])
-        contradiction = float(claim_triplet[1])
-        uncertainty = float(claim_triplet[2])
+    # Always use the pure Dempster-Shafer math for the scores
+    support = float(claim_triplet[0])
+    contradiction = float(claim_triplet[1])
+    uncertainty = float(claim_triplet[2])
 
     db.save_verdict(
         conn,
