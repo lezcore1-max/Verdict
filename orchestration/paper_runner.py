@@ -150,12 +150,12 @@ def run_paper(
     resume = _get_pending_claim_ids(conn, paper_id)
     status(f"🔄 Processing {len(resume)} claims (ProcessPoolExecutor, 8-min timeout each)...")
 
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ProcessPoolExecutor
 
     for claim_db_id in resume:
         status(f"  ⏳ Processing claim id={claim_db_id}...")
         try:
-            with ThreadPoolExecutor(max_workers=1) as executor:
+            with ProcessPoolExecutor(max_workers=1) as executor:
                 future = executor.submit(
                     _run_claim_subprocess,
                     claim_db_id,
@@ -323,7 +323,15 @@ def generate_paper_summary(paper_id: int, conn: sqlite3.Connection) -> None:
         text = claim_row["text"]
         adj = float(v["adjusted_support"] or 0)
         conflict = bool(v["conflict_flag"])
-        if adj > 0.6 and not conflict:
+        
+        # Check if the claim actually underwent a formal statistical test
+        formal_count = conn.execute("""
+            SELECT COUNT(*) FROM evidence e
+            JOIN sub_hypotheses sh ON e.sub_hyp_id = sh.id
+            WHERE sh.claim_id = ? AND e.p_value_tag = 'formal'
+        """, (v["claim_id"],)).fetchone()[0]
+
+        if adj > 0.6 and not conflict and formal_count > 0:
             formally_supported.append({"claim_id": v["claim_id"], "text": text[:200]})
         else:
             implied_only.append({"claim_id": v["claim_id"], "text": text[:200]})
@@ -364,23 +372,18 @@ def generate_paper_summary(paper_id: int, conn: sqlite3.Connection) -> None:
 
 def _check_reproducibility_flag(conn: sqlite3.Connection, paper_id: int) -> bool:
     """
-    Deterministic keyword search across claim text and sub-hypothesis text.
+    Deterministic keyword search across the full raw text of the paper.
     Case-insensitive. Returns True if any reproducibility concern keyword is found.
     """
-    claims = db.get_claims_for_paper(conn, paper_id)
-    for claim in claims:
-        text = (claim["text"] or "").lower()
-        for kw in _REPRO_KEYWORDS:
-            if kw in text:
-                return True
-
-        # Also check sub-hypotheses
-        sub_hyps = db.get_sub_hypotheses(conn, claim["id"])
-        for sh in sub_hyps:
-            sh_text = (sh["text"] or "").lower()
-            for kw in _REPRO_KEYWORDS:
-                if kw in sh_text:
-                    return True
+    full_text = db.get_paper_text(conn, paper_id)
+    if not full_text:
+        return False
+        
+    full_text = full_text.lower()
+    for kw in _REPRO_KEYWORDS:
+        if kw in full_text:
+            return True
+            
     return False
 
 

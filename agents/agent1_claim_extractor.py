@@ -91,9 +91,7 @@ def run(
         exact_key_fn=lambda c: c.text,
     )
 
-    # TEMPORARY LIMIT to save API quota
-    deduped = deduped[:3]
-
+    # Re-assign sequential positions after dedup
     # Re-assign sequential positions after dedup
     for i, claim in enumerate(deduped):
         claim.position = i
