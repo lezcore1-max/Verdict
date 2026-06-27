@@ -167,15 +167,17 @@ def init_db(conn: sqlite3.Connection) -> None:
 
 def upsert_paper(conn: sqlite3.Connection, file_path: str) -> int:
     """Insert paper or return existing id. Does NOT store full_text yet."""
+    # Fallback to SELECT then INSERT to support SQLite < 3.24.0 (Streamlit Cloud)
+    row = conn.execute("SELECT id FROM papers WHERE file_path=?", (file_path,)).fetchone()
+    if row:
+        return row["id"]
+        
     cur = conn.execute(
-        "INSERT INTO papers(file_path) VALUES(?) ON CONFLICT(file_path) DO NOTHING",
+        "INSERT INTO papers(file_path) VALUES(?)",
         (file_path,)
     )
     conn.commit()
-    if cur.lastrowid:
-        return cur.lastrowid
-    row = conn.execute("SELECT id FROM papers WHERE file_path=?", (file_path,)).fetchone()
-    return row["id"]
+    return cur.lastrowid
 
 
 def wipe_paper_state(conn: sqlite3.Connection, paper_id: int) -> None:
