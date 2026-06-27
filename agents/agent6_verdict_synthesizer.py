@@ -24,7 +24,7 @@ Your inputs include:
 - Conflict flags (HIGH CONFLICT if triggered)
 - Inter-agent disagreement score
 
-Synthesise a final verdict as a belief triplet {support, contradiction, uncertainty} that sums to 1.0, plus a plain-language explanation.
+Synthesise a final plain-language explanation of the verdict.
 
 The plain-language explanation MUST cover:
 1. What is SUPPORTED by the evidence
@@ -35,14 +35,9 @@ The plain-language explanation MUST cover:
 
 Return a JSON object:
 {
-  "support": float,          // 0.0-1.0
-  "contradiction": float,    // 0.0-1.0
-  "uncertainty": float,      // 0.0-1.0
   "conflict_flag": bool,
   "plain_language": "string"
 }
-
-The three float values should sum to approximately 1.0.
 
 Respond ONLY with a valid JSON object. No markdown fences, no explanation, no preamble."""
 
