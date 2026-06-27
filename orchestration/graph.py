@@ -159,6 +159,34 @@ def node_judge_evidence(state: VerdictState) -> VerdictState:
     import agents.agent4_evidence_judge as a4
     from agents.schemas import EvidenceItem
 
+    pwc_leaderboard = None
+    claimed_score = None
+
+    if state.get("claim_type") == "benchmark_performance":
+        from core.gemini_client import GeminiClient
+        from agents.agent3_evidence_hunter import get_pwc_leaderboard
+        
+        claim_text = state.get("claim_text", "")
+        client = GeminiClient(
+            model_name=state.get("model_name", "gemini-2.0-flash"),
+            temperature=0.0,
+            system_prompt="""Extract benchmark details from this claim text. 
+Return ONLY a valid JSON object with keys: "metric", "dataset", "task", "claimed_score" (float or null). 
+If a value is not present, use null.""",
+            api_key=state.get("api_key")
+        )
+        try:
+            raw = client.call(f"Claim: {claim_text}") or {}
+            claimed_score = raw.get("claimed_score")
+            if claimed_score is not None:
+                pwc_leaderboard = get_pwc_leaderboard(
+                    task=raw.get("task", ""),
+                    dataset=raw.get("dataset", ""),
+                    metric=raw.get("metric", "")
+                )
+        except Exception as exc:
+            logger.warning("Failed to extract benchmark details: %s", exc)
+
     judged_per_sub: dict[int, list[dict]] = {}
 
     for sh in state.get("sub_hypotheses", []):
@@ -172,7 +200,9 @@ def node_judge_evidence(state: VerdictState) -> VerdictState:
             judged = a4.run(
                 sub_hyp_text=sub_text,
                 evidence=ev_item,
-                claim_type=state["claim_type"],
+                claim_type=state.get("claim_type", ""),
+                claimed_score=claimed_score,
+                pwc_leaderboard=pwc_leaderboard,
                 model_name=state.get("model_name", "gemini-2.0-flash"),
                 api_key=state.get("api_key"),
             )
@@ -180,6 +210,8 @@ def node_judge_evidence(state: VerdictState) -> VerdictState:
                 d = judged.model_dump()
                 d["agent_source"] = ev_item.agent_source
                 judged_list.append(d)
+            else:
+                judged_list.append(None)
 
         judged_per_sub[pos] = judged_list
 
@@ -212,9 +244,9 @@ def node_run_math(state: VerdictState) -> VerdictState:
             disagreement_scores[pos] = 0.0
             continue
 
-        # Extract p-values and tags for SPRT
-        p_values = [max(float(j["p_value"]), P_VALUE_FLOOR) for j in judged_list]
-        tags = [j["p_value_tag"] for j in judged_list]
+        # Extract p-values and tags for SPRT (skip None items)
+        p_values = [max(float(j["p_value"]), P_VALUE_FLOOR) for j in judged_list if j is not None]
+        tags = [j["p_value_tag"] for j in judged_list if j is not None]
 
         # Run SPRT
         sprt_result = run_sprt(p_values, tags)
@@ -227,15 +259,15 @@ def node_run_math(state: VerdictState) -> VerdictState:
                 directionality=j["directionality"],
                 directness=j.get("directness", "partial_test"),
             )
-            for j in judged_list
+            for j in judged_list if j is not None
         ]
 
         combined, conflict = combine_all(masses)
         conflict_flags[pos] = conflict
 
         # Inter-agent disagreement: variance between agent4 and agent5 p-values
-        a4_p = [float(j["p_value"]) for j in judged_list if j.get("agent_source") == "agent3"]
-        a5_p = [float(j["p_value"]) for j in judged_list if j.get("agent_source") == "agent5"]
+        a4_p = [float(j["p_value"]) for j in judged_list if j is not None and j.get("agent_source") == "agent3"]
+        a5_p = [float(j["p_value"]) for j in judged_list if j is not None and j.get("agent_source") == "agent5"]
         disagreement = compute_disagreement_score(a4_p, a5_p)
         disagreement_scores[pos] = disagreement
 

@@ -134,6 +134,8 @@ def _persist_results(
         judged_list = state.get("judged_per_sub", {}).get(pos, [])
         ev_list = state.get("evidence_per_sub", {}).get(pos, [])
         for i, judged in enumerate(judged_list):
+            if judged is None:
+                continue
             ev = ev_list[i] if i < len(ev_list) else {}
             db.insert_evidence(
                 conn,
@@ -195,14 +197,23 @@ def _persist_results(
     verdict = state.get("final_verdict") or {}
     plain = verdict.get("plain_language", "Pipeline did not produce a verdict.")
 
+    if verdict and verdict.get("support") is not None:
+        support = float(verdict["support"])
+        contradiction = float(verdict["contradiction"])
+        uncertainty = float(verdict["uncertainty"])
+    else:
+        support = float(claim_triplet[0])
+        contradiction = float(claim_triplet[1])
+        uncertainty = float(claim_triplet[2])
+
     db.save_verdict(
         conn,
         claim_id=claim_id,
-        support=float(claim_triplet[0]),
-        contradiction=float(claim_triplet[1]),
-        uncertainty=float(claim_triplet[2]),
+        support=support,
+        contradiction=contradiction,
+        uncertainty=uncertainty,
         conflict_flag=any_conflict,
         disagreement_score=avg_disagreement,
-        adjusted_support=float(claim_triplet[0]),  # raw; dependency propagation updates this
+        adjusted_support=support,  # raw; dependency propagation updates this
         plain_language=plain,
     )

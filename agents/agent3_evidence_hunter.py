@@ -198,6 +198,49 @@ def _normalise_metric(metric: str) -> str:
     return METRIC_ALIASES.get(cleaned, METRIC_ALIASES.get(metric.lower(), cleaned))
 
 
+def get_pwc_leaderboard(task: str, dataset: str, metric: str) -> Optional[list[dict]]:
+    """Fetch raw leaderboard array for formal t-tests."""
+    if not (task or dataset) or not metric:
+        return None
+
+    try:
+        with httpx.Client(timeout=20) as client:
+            params = {}
+            if task: params["task"] = task
+            if dataset: params["dataset"] = dataset
+            params["metric"] = _normalise_metric(metric)
+
+            resp = client.get(f"{_PWC_BASE}/results/", params=params)
+            if resp.status_code != 200 or not resp.json().get("results"):
+                if task:
+                    resp = client.get(f"{_PWC_BASE}/sota/", params={"task": task})
+                else:
+                    return None
+            
+            data = resp.json()
+            results = data.get("results", [])
+            # Extract just the score values for the specified metric
+            leaderboard = []
+            norm_metric = _normalise_metric(metric)
+            for r in results:
+                metrics_dict = r.get("metrics", {})
+                # Attempt to find the metric (case-insensitive)
+                for k, v in metrics_dict.items():
+                    if _normalise_metric(k) == norm_metric or k.lower() == metric.lower():
+                        try:
+                            # some PwC scores are strings like "98.2%"
+                            val = float(str(v).replace('%', ''))
+                            leaderboard.append({"score": val})
+                        except (ValueError, TypeError):
+                            pass
+                        break
+            
+            return leaderboard if leaderboard else None
+    except Exception as exc:
+        logger.warning("Papers With Code leaderboard query failed: %s", exc)
+        return None
+
+
 def _pwc_search(sub_hyp_text: str) -> list[EvidenceItem]:
     """Query Papers With Code for leaderboard data related to the sub-hypothesis."""
     # Extract likely metric and dataset from sub-hypothesis text
