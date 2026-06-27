@@ -2,7 +2,15 @@
 orchestration/graph.py — LangGraph state graph for per-claim pipeline.
 
 Each node corresponds to one agent or the math computation step.
-State flows sequentially: A2 → A3 → A4 → A5 → math → A6.
+Agent 2 (decompose)
+    ↓
+Agent 3 ──┐
+          ├── merge + dedup → Agent 4 (judge)
+Agent 5 ──┘
+    ↓
+Math (SPRT + DST)
+    ↓
+Agent 6 (synthesize)
 Conditional edges skip to A6 on extraction failure.
 """
 import logging
