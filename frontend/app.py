@@ -207,7 +207,7 @@ hr.verdict-hr {
 
 def _get_db_path() -> str:
     if "db_path" not in st.session_state:
-        db_dir = os.path.join(_ROOT, "verdict_runs")
+        db_dir = os.path.join(tempfile.gettempdir(), "verdict_runs")
         os.makedirs(db_dir, exist_ok=True)
         st.session_state["db_path"] = os.path.join(db_dir, "verdict.db")
     return st.session_state["db_path"]
@@ -216,7 +216,7 @@ def _get_db_path() -> str:
 def _get_db_conn() -> sqlite3.Connection:
     """Read-only connection for the Streamlit main thread."""
     path = _get_db_path()
-    conn = sqlite3.connect(path, check_same_thread=False)
+    conn = sqlite3.connect(path, check_same_thread=False, timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
@@ -268,9 +268,9 @@ def _launch_pipeline(
     os.environ["EMBED_MODEL"] = embed_model
     os.environ["TAVILY_QUERY_CAP"] = str(tavily_cap)
 
-    upload_dir = os.path.join(_ROOT, "verdict_runs", "uploads")
-    os.makedirs(upload_dir, exist_ok=True)
-    pdf_path = os.path.join(upload_dir, uploaded_file.name)
+    db_dir = os.path.dirname(_get_db_path())
+    pdf_path = os.path.join(db_dir, uploaded_file.name)
+    os.makedirs(db_dir, exist_ok=True)
     with open(pdf_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
 
