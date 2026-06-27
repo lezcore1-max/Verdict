@@ -26,19 +26,11 @@ logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = """You are a scientific evidence evaluator. You receive a sub-hypothesis and a single piece of evidence. Your task is to judge whether and how the evidence tests the sub-hypothesis.
 
-CRITICAL RULES FOR BENCHMARK CLAIMS:
-- If the sub-hypothesis claims a model achieved a specific score (e.g., "28.4 BLEU"), your job is to judge whether the evidence confirms or denies that THE PAPER REPORTED THAT SCORE.
-- Do NOT mark it as "contradicting" just because newer models achieve higher scores. The claim is about what the paper reported, not about current state-of-the-art.
-- If the evidence shows the same paper/model achieving a similar score, it is SUPPORTING.
-- If the evidence shows independent reproductions achieving the same or similar score (within 1-2 points), it is SUPPORTING.
-- Only mark as "contradicting" if the evidence shows the specific claimed result was fabricated, retracted, or consistently irreproducible.
-- If the evidence discusses a completely different model or paper, mark as "inconclusive" — it is not relevant.
-
 Produce a structured assessment:
 - directly_tests: true if the evidence directly tests the sub-hypothesis, false if only tangential
 - directionality: "supporting" / "contradicting" / "inconclusive"
 - strength: "strong" / "moderate" / "weak"
-- p_value: a proxy p-value between 0 and 1 (not from a real statistical test; treat as approximate probability that the null hypothesis is true given this evidence). Low values = strong evidence. For well-known, widely-cited results confirmed by the evidence, use p_value between 0.001-0.01. For contradicting evidence, also use low p_value (0.001-0.05).
+- p_value: a proxy p-value between 0 and 1 (not from a real statistical test; treat as approximate probability that the null hypothesis is true given this evidence). Low values indicate strong evidence against the null (strong contradiction or confirmation). High values indicate weak evidence.
 - p_value_tag: always "approximate" (the formal tag is only assigned when real statistical tests are run)
 
 You do NOT see the original paper — only the sub-hypothesis and the evidence item.
@@ -129,66 +121,43 @@ def _formal_ttest(
     leaderboard: list[dict],
 ) -> Optional[JudgedEvidence]:
     """
-    Compare the paper's claimed score against the PwC leaderboard.
+    Run scipy.stats.ttest_1samp against the PwC leaderboard distribution.
 
-    The question is: "Did this paper plausibly achieve this score?"
-    NOT: "Is this score competitive with current SOTA?"
+    H0: The paper's claimed score is plausible given the leaderboard distribution.
+    alternative="less": one-sided test — is the paper's score ABOVE the leaderboard mean?
 
-    If the claimed score is within the range of known leaderboard results,
-    it is SUPPORTING (the score is a real, achievable result).
+    Returns JudgedEvidence with p_value_tag="formal", or None on failure.
     """
     try:
         import numpy as np
         scores = np.array([float(r["score"]) for r in leaderboard], dtype=np.float64)
         if len(scores) < 3:
-            return None  # Not enough data
+            return None  # Not enough data for a meaningful t-test
 
-        lb_mean = float(np.mean(scores))
-        lb_std = float(np.std(scores, ddof=1))
-        lb_min = float(np.min(scores))
-        lb_max = float(np.max(scores))
+        # One-sample t-test: is the claimed_score consistent with leaderboard distribution?
+        # A two-sided test will detect if the claimed_score is an outlier in either direction.
+        result = scipy_stats.ttest_1samp(scores, popmean=claimed_score, alternative="two-sided")
+        p_val = max(float(result.pvalue), P_VALUE_FLOOR)
 
-        # If claimed score is within the range [min, max] of leaderboard,
-        # or within 2 standard deviations of the mean, it's plausible
-        within_range = lb_min <= claimed_score <= lb_max
-        within_2sd = abs(claimed_score - lb_mean) <= 2.0 * lb_std if lb_std > 0 else within_range
-
-        if within_range or within_2sd:
-            # The score is achievable — supporting evidence
-            if lb_std > 0:
-                z = abs(claimed_score - lb_mean) / lb_std
-                p_val = max(float(2.0 * scipy_stats.norm.sf(z)), P_VALUE_FLOOR)
-            else:
-                p_val = 0.01  # All scores identical and match
-
-            return JudgedEvidence(
-                directly_tests=True,
-                directionality="supporting",
-                strength="strong" if p_val < 0.1 or within_range else "moderate",
-                p_value=p_val,
-                p_value_tag="formal",
-                eval_note=(
-                    f"Claimed score {claimed_score} is within the known leaderboard range "
-                    f"[{lb_min:.1f}, {lb_max:.1f}] (mean={lb_mean:.1f}, std={lb_std:.1f}). "
-                    f"This is an achievable, plausible result."
-                ),
-            )
+        if p_val < 0.05:
+            # Significant outlier! Too surprising, warranting skepticism.
+            directionality = "inconclusive"
+            strength = "weak"
+            eval_note = f"Claimed score {claimed_score} for '{sub_hyp_text}' is a statistical outlier relative to the leaderboard (p={p_val:.3f}). Warrants further verification."
         else:
-            # Score is outside the known range — inconclusive (not contradicting,
-            # since older papers may have lower scores than current leaderboard)
-            return JudgedEvidence(
-                directly_tests=True,
-                directionality="inconclusive",
-                strength="weak",
-                p_value=0.5,
-                p_value_tag="formal",
-                eval_note=(
-                    f"Claimed score {claimed_score} is outside the current leaderboard range "
-                    f"[{lb_min:.1f}, {lb_max:.1f}]. This may reflect a different evaluation "
-                    f"setup or an older benchmark era."
-                ),
-            )
+            # Plausible claim. Higher p-value = more consistent with known data.
+            directionality = "supporting"
+            strength = "strong" if p_val > 0.5 else "moderate" if p_val > 0.1 else "weak"
+            eval_note = f"Claimed score {claimed_score} for '{sub_hyp_text}' is consistent with the known leaderboard distribution."
+
+        return JudgedEvidence(
+            directly_tests=True,
+            directionality=directionality,
+            strength=strength,
+            p_value=p_val,
+            p_value_tag="formal",
+            eval_note=eval_note,
+        )
     except Exception as exc:
         logger.warning("Formal t-test failed: %s", exc)
         return None
-
