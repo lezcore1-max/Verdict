@@ -151,18 +151,18 @@ def combine_all(masses: list[np.ndarray]) -> tuple[np.ndarray, bool]:
     MAX_ALLOWED_CONFLICTS = 2
     conflict_count = 0
     for mass in masses[1:]:
-    last_good = accumulator.copy()
-    try:
-        accumulator = combine_two(accumulator, mass)
-    except ConflictError:
-        conflict_count += 1
-        accumulator = last_good  # skip this bad agent
-        
-        if conflict_count >= MAX_ALLOWED_CONFLICTS:
-            conflict_flag = True
-            break  # Okay, now too many agents are broken, halt everything!
-        else:
-            continue  # Give the next agent a chance
+        last_good = accumulator.copy()
+        try:
+            accumulator = combine_two(accumulator, mass)
+        except ConflictError:
+            conflict_count += 1
+            accumulator = last_good  # skip this bad agent
+            
+            if conflict_count >= MAX_ALLOWED_CONFLICTS:
+                conflict_flag = True
+                break  # Okay, now too many agents are broken, halt everything!
+            else:
+                continue  # Give the next agent a chance
     
     return accumulator, conflict_flag
 

@@ -378,30 +378,3 @@ def _doi_arxiv_key(item: EvidenceItem) -> str:
         return f"arxiv:{item.arxiv_id}"
     return item.source
 
-
-def get_pwc_leaderboard(sub_hyp_text: str, metric: str, dataset: str) -> list[dict]:
-    """
-    Fetch top-20 scores from PwC for a specific metric+dataset combination.
-    Used by Agent 4 for formal t-test computation.
-    Returns list of dicts with 'score' key.
-    """
-    scores = []
-    try:
-        with httpx.Client(timeout=20) as client:
-            normalised = _normalise_metric(metric)
-            resp = client.get(
-                f"{_PWC_BASE}/results/",
-                params={"dataset": dataset, "metric": normalised},
-            )
-            if resp.status_code == 200:
-                for r in resp.json().get("results", [])[:20]:
-                    m = r.get("metrics", {})
-                    val = m.get(normalised) or m.get(metric)
-                    if val is not None:
-                        try:
-                            scores.append({"score": float(val), "model": r.get("model_name", "")})
-                        except (TypeError, ValueError):
-                            pass
-    except Exception as exc:
-        logger.warning("PwC leaderboard fetch failed: %s", exc)
-    return scores

@@ -150,14 +150,14 @@ def run_paper(
     resume = _get_pending_claim_ids(conn, paper_id)
     status(f"🔄 Processing {len(resume)} claims (ProcessPoolExecutor, 8-min timeout each)...")
 
-    from concurrent.futures import ProcessPoolExecutor
+    import multiprocessing
 
     for claim_db_id in resume:
         status(f"  ⏳ Processing claim id={claim_db_id}...")
         try:
-            with ProcessPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(
-                    _run_claim_subprocess,
+            p = multiprocessing.Process(
+                target=_run_claim_subprocess,
+                args=(
                     claim_db_id,
                     paper_id,
                     db_path,
@@ -166,9 +166,20 @@ def run_paper(
                     tavily_key,
                     chroma_dir,
                 )
-                future.result(timeout=_CLAIM_TIMEOUT_SECONDS)
+            )
+            p.start()
+            p.join(timeout=_CLAIM_TIMEOUT_SECONDS)
+            
+            if p.is_alive():
+                p.terminate()
+                p.join()  # ensure cleanup
+                raise TimeoutError("Claim process timed out")
+                
+            if p.exitcode != 0:
+                raise RuntimeError(f"Claim process exited with code {p.exitcode}")
+                
             status(f"  ✅ Claim {claim_db_id} done")
-        except FuturesTimeoutError:
+        except TimeoutError:
             logger.warning("Claim %d timed out after %ds", claim_db_id, _CLAIM_TIMEOUT_SECONDS)
             mark_timed_out(conn, claim_db_id)
             status(f"  ⏰ Claim {claim_db_id} timed out")

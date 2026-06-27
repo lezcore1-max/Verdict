@@ -182,6 +182,12 @@ def wipe_paper_state(conn: sqlite3.Connection, paper_id: int) -> None:
     """Wipes all pipeline data for a paper so it can be re-run from scratch."""
     conn.execute("DELETE FROM agent_logs WHERE claim_id IN (SELECT id FROM claims WHERE paper_id=?)", (paper_id,))
     conn.execute("DELETE FROM pipeline_state WHERE claim_id IN (SELECT id FROM claims WHERE paper_id=?)", (paper_id,))
+    
+    # Delete children of sub_hypotheses first to avoid FK constraint errors
+    conn.execute("DELETE FROM ds_masses WHERE sub_hyp_id IN (SELECT id FROM sub_hypotheses WHERE claim_id IN (SELECT id FROM claims WHERE paper_id=?))", (paper_id,))
+    conn.execute("DELETE FROM sprt_results WHERE sub_hyp_id IN (SELECT id FROM sub_hypotheses WHERE claim_id IN (SELECT id FROM claims WHERE paper_id=?))", (paper_id,))
+    conn.execute("DELETE FROM evidence WHERE sub_hyp_id IN (SELECT id FROM sub_hypotheses WHERE claim_id IN (SELECT id FROM claims WHERE paper_id=?))", (paper_id,))
+    
     conn.execute("DELETE FROM sub_hypotheses WHERE claim_id IN (SELECT id FROM claims WHERE paper_id=?)", (paper_id,))
     conn.execute("DELETE FROM verdicts WHERE claim_id IN (SELECT id FROM claims WHERE paper_id=?)", (paper_id,))
     conn.execute("DELETE FROM dependency_edges WHERE from_claim_id IN (SELECT id FROM claims WHERE paper_id=?) OR to_claim_id IN (SELECT id FROM claims WHERE paper_id=?)", (paper_id, paper_id))
