@@ -252,7 +252,7 @@ def _pwc_search(sub_hyp_text: str) -> list[EvidenceItem]:
     items: list[EvidenceItem] = []
 
     try:
-        with httpx.Client(timeout=20) as client:
+        with httpx.Client(timeout=20, follow_redirects=True) as client:
             # Primary: /api/results/ with task, dataset, metric
             params = {}
             if task_guess:
