@@ -138,7 +138,9 @@ def node_hunt_evidence(state: VerdictState) -> VerdictState:
         )
 
         # Merge and deduplicate across both agents BEFORE any math
-        all_ev = ev3.evidence + ev5.evidence
+        ev3_list = ev3.evidence if ev3 else []
+        ev5_list = ev5.evidence if ev5 else []
+        all_ev = ev3_list + ev5_list
         embedder = LocalEmbedder()
         from agents.agent3_evidence_hunter import _doi_arxiv_key
         deduped = embedder.deduplicate(
