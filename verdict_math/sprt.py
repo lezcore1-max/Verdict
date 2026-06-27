@@ -52,8 +52,8 @@ def run_sprt(
         decision: "FALSIFIED" | "INSUFFICIENT_EVIDENCE" | "UNDECIDED"
 
     Stopping rule:
-        product >= UPPER_THRESHOLD (8.0) → FALSIFIED
-        product <= LOWER_THRESHOLD (0.222) → INSUFFICIENT_EVIDENCE
+        product >= UPPER_THRESHOLD (19.0) → FALSIFIED
+        product <= LOWER_THRESHOLD (0.0526) → INSUFFICIENT_EVIDENCE
         Evidence exhausted without crossing either → UNDECIDED
     """
     if p_value_tags is None:

@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 _SYSTEM_PROMPT = """You are a scientific evidence evaluator. You receive a sub-hypothesis and a single piece of evidence. Your task is to judge whether and how the evidence tests the sub-hypothesis.
 
 Produce a structured assessment:
-- directly_tests: true if the evidence directly tests the sub-hypothesis, false if only tangential
-- directionality: "supporting" / "contradicting" / "inconclusive"
+- directly_tests: true if the evidence directly tests the sub-hypothesis, false if only tangential. Ask yourself: "Does this source speak to the stated claim directly, or is it addressing a related but different claim?"
+- directionality: "supporting" / "contradicting" / "inconclusive". If the evidence addresses a related but different claim (e.g. theoretical vs empirical), mark it INCONCLUSIVE, not contradicting.
 - strength: "strong" / "moderate" / "weak"
 - p_value: a proxy p-value between 0 and 1 (not from a real statistical test; treat as approximate probability that the null hypothesis is true given this evidence). Low values indicate strong evidence against the null (strong contradiction or confirmation). High values indicate weak evidence.
 - p_value_tag: always "approximate" (the formal tag is only assigned when real statistical tests are run)

@@ -24,6 +24,16 @@ Rules:
 5. Do NOT reference the original paper, its authors, or specific experimental details. Frame sub-hypotheses as general testable propositions.
 6. Output 2 to 3 sub-hypotheses maximum.
 
+CLAIM INTERPRETATION RULE:
+You must verify the claim EXACTLY as stated — do not upgrade it to a stronger or more general version.
+- Is this an EMPIRICAL claim (a reported measurement/benchmark result)?
+- Is this a THEORETICAL claim (asymptotic complexity, formal proof)?
+If the claim contains a specific numeric ratio (e.g. "28.4x"), treat it as an empirical claim about a specific experimental configuration. Do NOT verify it as a complexity class or asymptotic scaling claim.
+Example of claim drift to AVOID:
+  Stated claim: "MSA reduces compute by 28.4x at 1M context"
+  Drifted claim: "MSA has lower asymptotic complexity than GQA"
+  <- These are DIFFERENT claims. Only verify the stated one.
+
 You will receive the claim text and its type tag.
 
 Respond ONLY with a valid JSON object. No markdown fences, no explanation, no preamble."""
