@@ -24,9 +24,9 @@ TAVILY_QUERY_CAP: int = int(os.getenv("TAVILY_QUERY_CAP", "200"))
 # ── ChromaDB ─────────────────────────────────────────────────────────────────
 CHROMA_DIR: str = os.getenv("CHROMA_DIR", os.path.join(_ROOT, "chroma_db"))
 
-# ── SPRT thresholds (Wald: α=0.1, β=0.2) ────────────────────────────────────
-UPPER_THRESHOLD: float = 8.0      # (1 - β) / α  = 0.8 / 0.1
-LOWER_THRESHOLD: float = 0.222    # β / (1 - α)  = 0.2 / 0.9 ≈ 0.222
+# ── SPRT thresholds (Wald: α=0.05, β=0.05) ────────────────────────────────────
+UPPER_THRESHOLD: float = 19.0     # (1 - β) / α  = 0.95 / 0.05 = 19.0
+LOWER_THRESHOLD: float = 0.0526   # β / (1 - α)  = 0.05 / 0.95 ≈ 0.0526
 P_VALUE_FLOOR: float = 1e-6       # Clamp minimum to prevent division by zero
 
 # ── Dempster-Shafer ───────────────────────────────────────────────────────────
