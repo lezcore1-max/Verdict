@@ -81,10 +81,12 @@ def run(
         api_key=api_key,
     )
 
+    evidence_text = (evidence.raw_content or evidence.content)[:2000]
+
     prompt = (
         f"Sub-hypothesis: {sub_hyp_text}\n\n"
         f"Evidence source: {evidence.source}\n"
-        f"Evidence content: {evidence.content}\n"
+        f"Evidence content: {evidence_text}\n"
         f"Evidence reliability: {evidence.reliability_tier}\n"
         f"Evidence directness: {evidence.directness}\n\n"
         "Judge whether this evidence supports or contradicts the sub-hypothesis."
