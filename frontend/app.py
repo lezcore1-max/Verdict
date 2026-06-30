@@ -495,6 +495,24 @@ def main():
     else:
         # Active or completed run
         conn = _get_db_conn()
+
+        # Display prominent error warnings if the background runner fails
+        if not is_running and "status_messages" in st.session_state:
+            pipeline_errors = [msg for msg in st.session_state["status_messages"] if "Pipeline error:" in msg or "failed:" in msg.lower() or "error" in msg.lower()]
+            if pipeline_errors:
+                error_msg = pipeline_errors[-1]
+                st.error("### ⚠️ Pipeline Execution Failed")
+                st.markdown("**Detailed LLM Error / API Response:**")
+                st.code(error_msg, language="text")
+                
+                # Custom troubleshooting tips
+                if "429" in error_msg or "quota" in error_msg.lower() or "rate_limit" in error_msg.lower() or "limit exceeded" in error_msg.lower():
+                    st.warning("💡 **Troubleshooting Tip:** You hit an API rate limit or quota limit. If you are using Gemini's free tier, you might have exceeded requests-per-minute (RPM) limits. Please wait 60 seconds and try again, or check your API billing dashboard.")
+                elif "insufficient_quota" in error_msg.lower() or "credit" in error_msg.lower() or "billing" in error_msg.lower():
+                    st.warning("💡 **Troubleshooting Tip:** Your API credentials lack credits or have insufficient quota for this model. Please check your billing dashboard.")
+                elif "401" in error_msg or "unauthorized" in error_msg.lower() or "api key" in error_msg.lower() or "invalid key" in error_msg.lower():
+                    st.warning("💡 **Troubleshooting Tip:** Authorization failed. Please verify that your GEMINI_API_KEY is correct and valid in the sidebar configuration.")
+
         try:
             claims = conn.execute(
                 "SELECT * FROM claims WHERE paper_id=? ORDER BY position", (paper_id,)

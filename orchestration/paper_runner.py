@@ -91,9 +91,8 @@ def run_paper(
     status("🔍 Extracting text from PDF...")
     full_text = extract_text(pdf_path)
     if not full_text.strip():
-        logger.error("PDF text extraction returned empty string for %s", pdf_path)
         conn.close()
-        return paper_id
+        raise RuntimeError("PDF text extraction returned empty text. The file might be scanned, corrupted, or password-protected.")
     db.set_paper_text(conn, paper_id, full_text)
     status(f"✅ Text extracted ({len(full_text):,} chars)")
 
@@ -117,10 +116,12 @@ def run_paper(
     import agents.agent1_claim_extractor as a1
     claim_output = a1.run(full_text, model_name=model_name, api_key=api_key)
 
-    if claim_output is None or not claim_output.claims:
-        status("⚠️ Agent 1 returned no claims")
+    if claim_output is None:
         conn.close()
-        return paper_id
+        raise RuntimeError("Agent 1 failed to extract claims. This is typically due to an invalid API key, network timeout, or rate limits.")
+    if not claim_output.claims:
+        conn.close()
+        raise RuntimeError("Agent 1 returned no claims. The paper may not contain empirical, falsifiable scientific claims or quantitative results.")
 
     status(f"✅ Extracted {len(claim_output.claims)} claims")
 
