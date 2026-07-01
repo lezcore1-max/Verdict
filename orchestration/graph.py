@@ -372,6 +372,12 @@ def node_run_math(state: VerdictState) -> VerdictState:
                 cap_info_msgs.append(f"Sub-hypothesis '{max_sh['text']}' is a necessary condition and increased claim contradiction to {max_contra*100:.1f}%.")
             final_contradiction = max(c_sup, max_contra)
 
+    # Ensure support and contradiction don't exceed 1.0 (safety backstop)
+    total_mass = final_support + final_contradiction
+    if total_mass > 1.0:
+        final_support /= total_mass
+        final_contradiction /= total_mass
+
     final_uncertainty = max(0.0, 1.0 - final_support - final_contradiction)
     cap_info_str = " ".join(cap_info_msgs)
 
