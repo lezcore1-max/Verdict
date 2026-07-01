@@ -379,7 +379,7 @@ with st.sidebar:
         for i, c in enumerate(st.session_state["manual_claims"]):
             st.markdown(f"**Claim {i+1}**")
             c["text"] = st.text_area(f"Claim Text", value=c["text"], key=f"claim_text_{i}", height=80, label_visibility="collapsed")
-            c["type"] = st.selectbox(f"Claim Type", ["empirical", "theoretical", "methodological", "benchmark"], index=["empirical", "theoretical", "methodological", "benchmark"].index(c["type"]), key=f"claim_type_{i}", label_visibility="collapsed")
+            c["type"] = st.selectbox(f"Claim Type", ["empirical", "theoretical", "methodological", "benchmark_performance"], index=["empirical", "theoretical", "methodological", "benchmark_performance"].index(c["type"] if c["type"] != "benchmark" else "benchmark_performance"), key=f"claim_type_{i}", label_visibility="collapsed")
             st.markdown("<hr style='margin: 0.5rem 0; border-color: rgba(99,179,237,0.1)'>", unsafe_allow_html=True)
             
         if st.button("➕ Add Another Claim", use_container_width=True):
