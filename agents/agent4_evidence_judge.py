@@ -63,7 +63,9 @@ Return a JSON object:
   "scores_b": [list of floats, if two_sample_ind],
   "count": int (if proportion),
   "total": int (if proportion),
-  "single_score": float (if single_score_vs_claim)
+  "single_score": float (if single_score_vs_claim),
+  "directly_tests": true/false (true if the numbers directly address the claim, false if tangential),
+  "direction_from_numbers": "supporting" or "contradicting" (based on whether the extracted numbers confirm or refute the claim's threshold)
 }
 Respond ONLY with valid JSON."""
 
@@ -99,8 +101,13 @@ def _extract_numbers_and_compute_pvalue(
         f"Evidence text:\n{evidence_text}\n"
     )
 
-    client.system_prompt = _EXTRACTOR_SYSTEM_PROMPT
-    raw = client.call(prompt)
+    extractor_client = GeminiClient(
+        model_name=client.model_name,
+        temperature=0.1,
+        system_prompt=_EXTRACTOR_SYSTEM_PROMPT,
+        api_key=client.api_key,
+    )
+    raw = extractor_client.call(prompt)
     
     if not raw or raw.get("test_type", "none") == "none":
         return None
@@ -125,8 +132,15 @@ def _extract_numbers_and_compute_pvalue(
             # Ensure expected is a probability
             if expected > 1.0:
                 expected = expected / 100.0
-            res = scipy_stats.binom_test(count, total, p=expected)
-            p_val = float(res)
+            
+            # Use binomtest (newer scipy API)
+            try:
+                res = scipy_stats.binomtest(count, total, p=expected)
+                p_val = float(res.pvalue)
+            except AttributeError:
+                # Fallback for older scipy versions
+                res = scipy_stats.binom_test(count, total, p=expected)
+                p_val = float(res)
             
         elif test_type == "one_sample_mean":
             scores = np.array(raw.get("scores_a", []), dtype=np.float64)
@@ -145,21 +159,37 @@ def _extract_numbers_and_compute_pvalue(
             p_val = float(res.pvalue)
             
         elif test_type == "single_score_vs_claim":
-            return None
+            single_score = float(raw.get("single_score", 0.0))
+            if claimed_score is None:
+                return None
+            # Normalize if percentage
+            score = single_score / 100.0 if single_score > 1.0 else single_score
+            claim = claimed_score / 100.0 if claimed_score > 1.0 else claimed_score
+            
+            # Treat as one-sample binomial with n=100 (conservative assumption)
+            count = int(round(score * 100))
+            try:
+                res = scipy_stats.binomtest(count, 100, p=claim)
+                p_val = float(res.pvalue)
+            except AttributeError:
+                res = scipy_stats.binom_test(count, 100, p=claim)
+                p_val = float(res)
             
         else:
             return None
 
         p_val = max(p_val, P_VALUE_FLOOR)
         
-        directionality = "supporting" if p_val > 0.1 else "contradicting"
-        strength = "strong" if p_val < 0.05 or p_val > 0.5 else "moderate"
-        if 0.05 <= p_val <= 0.1:
-             directionality = "inconclusive"
-             strength = "weak"
+        # Use LLM's semantic understanding of directionality (since "better" could be higher or lower)
+        directionality = raw.get("direction_from_numbers", "supporting")
+        
+        # Strength is determined by the extremity of the p-value against the null
+        strength = "strong" if p_val < 0.05 else "moderate"
+        if p_val > 0.1:
+            strength = "weak"
              
         return JudgedEvidence(
-            directly_tests=True,
+            directly_tests=raw.get("directly_tests", True),
             directionality=directionality,
             strength=strength,
             p_value=p_val,
@@ -209,7 +239,6 @@ def run(
     if extracted_result is not None:
         return extracted_result
 
-    client.system_prompt = _SYSTEM_PROMPT
     prompt = (
         f"Sub-hypothesis: {sub_hyp_text}\n\n"
         f"Evidence source: {evidence.source}\n"
