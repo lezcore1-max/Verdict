@@ -21,7 +21,7 @@ Rules:
 2. Each sub-hypothesis must be independently testable with external evidence.
 3. Sub-hypotheses must be INDEPENDENT of each other.
 4. State the logical_relationship explicitly for each (e.g., "necessary condition", "independent supporting condition").
-5. Do NOT reference "the paper" or "the authors". However, you MUST retain the specific dataset, benchmark, metric, and domain scope (e.g., TopoBench, D3 regime) in every sub-hypothesis. Do not over-generalize the claim into a generic machine learning statement if it was about a specific evaluation.
+5. Do NOT reference "the paper" or "the authors". However, you MUST retain the specific dataset, benchmark, metric, and domain scope (e.g., TopoBench, D3 regime) in every sub-hypothesis. If the claim mentions "evaluated models", you MUST explicitly scope the sub-hypothesis to "the models evaluated in the primary source document" to prevent it from being interpreted as a universal claim about all models ever created.
 6. Output 2 to 3 sub-hypotheses maximum.
 
 CLAIM INTERPRETATION RULE:

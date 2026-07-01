@@ -169,7 +169,7 @@ def node_judge_evidence(state: VerdictState) -> VerdictState:
     pwc_leaderboard = None
     claimed_score = None
 
-    if state.get("claim_type") == "benchmark_performance":
+    if state.get("claim_type") in ("benchmark_performance", "comparative"):
         from core.gemini_client import GeminiClient
         from agents.agent3_evidence_hunter import get_pwc_leaderboard
         
