@@ -37,6 +37,7 @@ class GeminiClient:
         if not key:
             raise ValueError("GEMINI_API_KEY is not set.")
         genai.configure(api_key=key)
+        self.api_key = key
         self.model_name = model_name
         self.temperature = temperature
         self.system_prompt = system_prompt
