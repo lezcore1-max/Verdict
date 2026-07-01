@@ -159,6 +159,13 @@ CREATE TABLE IF NOT EXISTS ui_logs (
 def init_db(conn: sqlite3.Connection) -> None:
     """Create all tables if they do not already exist."""
     conn.executescript(_SCHEMA)
+    
+    # Graceful migration: add eval_note if missing from older DBs
+    try:
+        conn.execute("ALTER TABLE evidence ADD COLUMN eval_note TEXT")
+    except sqlite3.OperationalError:
+        pass
+        
     conn.commit()
 
 
