@@ -422,7 +422,8 @@ def _check_reproducibility_flag(conn: sqlite3.Connection, paper_id: int) -> bool
     Deterministic keyword search across the full raw text of the paper.
     Case-insensitive. Returns True if any reproducibility concern keyword is found.
     """
-    full_text = db.get_paper_text(conn, paper_id)
+    row = db.get_paper(conn, paper_id)
+    full_text = row["full_text"] if row else None
     if not full_text:
         return False
         
