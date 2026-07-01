@@ -221,6 +221,7 @@ If a value is not present, use null.""",
             if judged is not None:
                 d = judged.model_dump()
                 d["agent_source"] = ev_item.agent_source
+                d["directness"] = ev_item.directness
                 judged_list.append(d)
             else:
                 judged_list.append(None)
@@ -256,9 +257,17 @@ def node_run_math(state: VerdictState) -> VerdictState:
             disagreement_scores[pos] = 0.0
             continue
 
-        # Extract p-values and tags for SPRT (skip None items)
-        p_values = [max(float(j["p_value"]), P_VALUE_FLOOR) for j in judged_list if j is not None]
-        tags = [j["p_value_tag"] for j in judged_list if j is not None]
+        # Extract p-values and tags for SPRT (skip None items and tangential evidence)
+        p_values = [
+            max(float(j["p_value"]), P_VALUE_FLOOR)
+            for j in judged_list
+            if j is not None and j.get("directness", "partial_test") != "tangential"
+        ]
+        tags = [
+            j["p_value_tag"]
+            for j in judged_list
+            if j is not None and j.get("directness", "partial_test") != "tangential"
+        ]
 
         # Run SPRT
         alpha = state.get("alpha", 0.05)
