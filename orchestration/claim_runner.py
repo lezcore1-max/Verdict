@@ -147,7 +147,7 @@ def _persist_results(
                 source=ev.get("source", ""),
                 content=ev.get("content", ""),
                 reliability_tier=ev.get("reliability_tier", "blog"),
-                directness=ev.get("directness", "tangential"),
+                directness=judged.get("directness", ev.get("directness", "tangential")),
                 p_value=judged.get("p_value"),
                 p_value_tag=judged.get("p_value_tag", "approximate"),
                 directionality=judged.get("directionality"),

@@ -224,7 +224,10 @@ If a value is not present, use null.""",
             if judged is not None:
                 d = judged.model_dump()
                 d["agent_source"] = ev_item.agent_source
-                d["directness"] = ev_item.directness
+                if not judged.directly_tests:
+                    d["directness"] = "tangential"
+                else:
+                    d["directness"] = ev_item.directness
                 judged_list.append(d)
             else:
                 judged_list.append(None)
@@ -310,9 +313,13 @@ def node_run_math(state: VerdictState) -> VerdictState:
     # Compute claim-level DS logic incorporating logical relationships
     # -------------------------------------------------------------------------
     sub_hyps = state.get("sub_hypotheses", [])
-    necessary = [sh for sh in sub_hyps if sh.get("logical_relationship") == "necessary condition"]
-    sufficient = [sh for sh in sub_hyps if sh.get("logical_relationship") == "sufficient condition"]
-    supporting = [sh for sh in sub_hyps if sh.get("logical_relationship") not in ("necessary condition", "sufficient condition")]
+    
+    def normalize_rel(sh):
+        return sh.get("logical_relationship", "").lower().strip()
+        
+    necessary = [sh for sh in sub_hyps if normalize_rel(sh) == "necessary condition"]
+    sufficient = [sh for sh in sub_hyps if normalize_rel(sh) == "sufficient condition"]
+    supporting = [sh for sh in sub_hyps if normalize_rel(sh) not in ("necessary condition", "sufficient condition")]
 
     if supporting:
         supporting_masses = [
