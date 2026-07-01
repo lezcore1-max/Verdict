@@ -29,7 +29,7 @@ from core.pipeline_state import mark_timed_out
 
 logger = logging.getLogger(__name__)
 
-_CLAIM_TIMEOUT_SECONDS = 8 * 60  # 8 minutes
+_CLAIM_TIMEOUT_SECONDS = 30 * 60  # 30 minutes
 
 # Reproducibility flag keywords (case-insensitive substring match)
 _REPRO_KEYWORDS = [

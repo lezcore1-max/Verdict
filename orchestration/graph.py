@@ -203,36 +203,57 @@ If a value is not present, use null.""",
             logger.warning("Failed to extract benchmark details: %s", exc)
 
     judged_per_sub: dict[int, list[dict]] = {}
+    from concurrent.futures import ThreadPoolExecutor
 
+    def _judge_ev(ev_dict, sub_text):
+        ev_item = EvidenceItem.model_validate(ev_dict)
+        judged = a4.run(
+            sub_hyp_text=sub_text,
+            evidence=ev_item,
+            claim_type=state.get("claim_type", ""),
+            claimed_score=claimed_score,
+            pwc_leaderboard=pwc_leaderboard,
+            model_name=state.get("model_name", "gemini-2.0-flash"),
+            api_key=state.get("api_key"),
+        )
+        if judged is not None:
+            d = judged.model_dump()
+            d["agent_source"] = ev_item.agent_source
+            if not judged.directly_tests:
+                d["directness"] = "tangential"
+            else:
+                d["directness"] = ev_item.directness
+            return d
+        return None
+
+    # Flatten tasks to run them concurrently without deadlocks
+    tasks = []
     for sh in state.get("sub_hypotheses", []):
         pos = sh["position"]
         sub_text = sh["text"]
         ev_list = state.get("evidence_per_sub", {}).get(pos, [])
+        for i, ev_dict in enumerate(ev_list):
+            tasks.append((pos, i, ev_dict, sub_text))
 
-        judged_list = []
-        for ev_dict in ev_list:
-            ev_item = EvidenceItem.model_validate(ev_dict)
-            judged = a4.run(
-                sub_hyp_text=sub_text,
-                evidence=ev_item,
-                claim_type=state.get("claim_type", ""),
-                claimed_score=claimed_score,
-                pwc_leaderboard=pwc_leaderboard,
-                model_name=state.get("model_name", "gemini-2.0-flash"),
-                api_key=state.get("api_key"),
-            )
-            if judged is not None:
-                d = judged.model_dump()
-                d["agent_source"] = ev_item.agent_source
-                if not judged.directly_tests:
-                    d["directness"] = "tangential"
-                else:
-                    d["directness"] = ev_item.directness
-                judged_list.append(d)
-            else:
-                judged_list.append(None)
+    # We use max_workers=3 to avoid rate limits on the free tier
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = {
+            executor.submit(_judge_ev, ev_dict, sub_text): (pos, i)
+            for pos, i, ev_dict, sub_text in tasks
+        }
+        
+        # Pre-allocate judged_per_sub with Nones to maintain order
+        for sh in state.get("sub_hypotheses", []):
+            pos = sh["position"]
+            ev_list = state.get("evidence_per_sub", {}).get(pos, [])
+            judged_per_sub[pos] = [None] * len(ev_list)
 
-        judged_per_sub[pos] = judged_list
+        for future in futures:
+            pos, i = futures[future]
+            try:
+                judged_per_sub[pos][i] = future.result()
+            except Exception as exc:
+                logger.error("Agent 4 evaluation failed for sub %d ev %d: %s", pos, i, exc)
 
     return {**state, "judged_per_sub": judged_per_sub}
 
