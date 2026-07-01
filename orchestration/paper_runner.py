@@ -47,8 +47,10 @@ _REPRO_KEYWORDS = [
 # ─────────────────────────────────────────────────────────────────────────────
 
 def run_paper(
-    pdf_path: str,
-    db_path: str,
+    input_mode: str = "Upload PDF",
+    manual_claims: Optional[list] = None,
+    pdf_path: str = "",
+    db_path: str = "",
     model_name: str = GEMINI_MODEL,
     api_key: Optional[str] = None,
     tavily_key: Optional[str] = None,
@@ -56,7 +58,7 @@ def run_paper(
     status_callback=None,   # optional callable(str) for progress reporting
 ) -> int:
     """
-    Run the full VERDICT pipeline for a PDF.
+    Run the full VERDICT pipeline for a PDF or direct claims.
 
     Args:
         pdf_path:         Absolute path to the PDF file.
@@ -87,65 +89,90 @@ def run_paper(
     paper_id = db.upsert_paper(conn, pdf_path)
     status(f"📄 Paper registered (id={paper_id})")
 
-    # ── Step 2: Extract text ─────────────────────────────────────────────────
-    status("🔍 Extracting text from PDF...")
-    full_text = extract_text(pdf_path)
-    if not full_text.strip():
-        conn.close()
-        raise RuntimeError("PDF text extraction returned empty text. The file might be scanned, corrupted, or password-protected.")
-    db.set_paper_text(conn, paper_id, full_text)
-    status(f"✅ Text extracted ({len(full_text):,} chars)")
-
-    # ── Step 3: Pre-ingest into ChromaDB ─────────────────────────────────────
-    if not db.is_paper_ingested(conn, paper_id):
-        status("📚 Ingesting paper into ChromaDB RAG store...")
-        try:
-            from core.rag import get_chroma_collection, ingest_chunks
-            collection = get_chroma_collection(chroma_dir)
-            chunks = chunk_text(full_text, chunk_tokens=512, overlap_tokens=64)
-            ingest_chunks(collection, paper_id, chunks)
-            db.mark_paper_ingested(conn, paper_id)
-            status(f"✅ Ingested {len(chunks)} chunks into ChromaDB")
-        except Exception as exc:
-            logger.warning("ChromaDB ingestion failed: %s", exc)
-    else:
-        status("✅ Paper already ingested in ChromaDB")
-
-    # ── Step 4: Run Agent 1 ───────────────────────────────────────────────────
-    status("🤖 Agent 1: Extracting falsifiable claims...")
-    import agents.agent1_claim_extractor as a1
-    claim_output = a1.run(full_text, model_name=model_name, api_key=api_key)
-
-    if claim_output is None:
-        conn.close()
-        raise RuntimeError("Agent 1 failed to extract claims. This is typically due to an invalid API key, network timeout, or rate limits.")
-    if not claim_output.claims:
-        conn.close()
-        raise RuntimeError("Agent 1 returned no claims. The paper may not contain empirical, falsifiable scientific claims or quantitative results.")
-
-    status(f"✅ Extracted {len(claim_output.claims)} claims")
-
-    # ── Step 5: Insert claims + resolve dependency pairs ──────────────────────
     inserted_claims: list[dict] = []  # {"position": int, "db_id": int}
-    for claim in claim_output.claims:
-        claim_db_id = db.insert_claim(
-            conn,
-            paper_id=paper_id,
-            text=claim.text,
-            claim_type=claim.type,
-            epistemic_weight=claim.epistemic_weight,
-            section=claim.section,
-            position=claim.position,
-        )
-        inserted_claims.append({"position": claim.position, "db_id": claim_db_id})
 
-    # Resolve positional dependency pairs → real SQLite claim IDs
-    position_to_id = {c["position"]: c["db_id"] for c in inserted_claims}
-    for (from_pos, to_pos) in claim_output.dependency_pairs:
-        if from_pos in position_to_id and to_pos in position_to_id:
-            db.insert_dependency_edge(conn, position_to_id[from_pos], position_to_id[to_pos])
-
-    status(f"✅ Inserted {len(inserted_claims)} claims + {len(claim_output.dependency_pairs)} dependency edges")
+    if input_mode == "Direct Claims" and manual_claims:
+        status("📝 Using manual claims. Skipping Agent 1 extraction...")
+        db.set_paper_text(conn, paper_id, "Manual Claim Input - No Full Text")
+        
+        for i, mc in enumerate(manual_claims):
+            text = mc.get("text", "").strip()
+            if not text:
+                continue
+            ctype = mc.get("type", "empirical")
+            
+            claim_db_id = db.insert_claim(
+                conn,
+                paper_id=paper_id,
+                text=text,
+                claim_type=ctype,
+                epistemic_weight=1.0,
+                section="Manual Input",
+                position=i + 1,
+            )
+            inserted_claims.append({"position": i + 1, "db_id": claim_db_id})
+            
+        status(f"✅ Inserted {len(inserted_claims)} manual claims")
+        
+    else:
+        # ── Step 2: Extract text ─────────────────────────────────────────────────
+        status("🔍 Extracting text from PDF...")
+        full_text = extract_text(pdf_path)
+        if not full_text.strip():
+            conn.close()
+            raise RuntimeError("PDF text extraction returned empty text. The file might be scanned, corrupted, or password-protected.")
+        db.set_paper_text(conn, paper_id, full_text)
+        status(f"✅ Text extracted ({len(full_text):,} chars)")
+    
+        # ── Step 3: Pre-ingest into ChromaDB ─────────────────────────────────────
+        if not db.is_paper_ingested(conn, paper_id):
+            status("📚 Ingesting paper into ChromaDB RAG store...")
+            try:
+                from core.rag import get_chroma_collection, ingest_chunks
+                collection = get_chroma_collection(chroma_dir)
+                chunks = chunk_text(full_text, chunk_tokens=512, overlap_tokens=64)
+                ingest_chunks(collection, paper_id, chunks)
+                db.mark_paper_ingested(conn, paper_id)
+                status(f"✅ Ingested {len(chunks)} chunks into ChromaDB")
+            except Exception as exc:
+                logger.warning("ChromaDB ingestion failed: %s", exc)
+        else:
+            status("✅ Paper already ingested in ChromaDB")
+    
+        # ── Step 4: Run Agent 1 ───────────────────────────────────────────────────
+        status("🤖 Agent 1: Extracting falsifiable claims...")
+        import agents.agent1_claim_extractor as a1
+        claim_output = a1.run(full_text, model_name=model_name, api_key=api_key)
+    
+        if claim_output is None:
+            conn.close()
+            raise RuntimeError("Agent 1 failed to extract claims. This is typically due to an invalid API key, network timeout, or rate limits.")
+        if not claim_output.claims:
+            conn.close()
+            raise RuntimeError("Agent 1 returned no claims. The paper may not contain empirical, falsifiable scientific claims or quantitative results.")
+    
+        status(f"✅ Extracted {len(claim_output.claims)} claims")
+    
+        # ── Step 5: Insert claims + resolve dependency pairs ──────────────────────
+        for claim in claim_output.claims:
+            claim_db_id = db.insert_claim(
+                conn,
+                paper_id=paper_id,
+                text=claim.text,
+                claim_type=claim.type,
+                epistemic_weight=claim.epistemic_weight,
+                section=claim.section,
+                position=claim.position,
+            )
+            inserted_claims.append({"position": claim.position, "db_id": claim_db_id})
+    
+        # Resolve positional dependency pairs → real SQLite claim IDs
+        position_to_id = {c["position"]: c["db_id"] for c in inserted_claims}
+        for (from_pos, to_pos) in claim_output.dependency_pairs:
+            if from_pos in position_to_id and to_pos in position_to_id:
+                db.insert_dependency_edge(conn, position_to_id[from_pos], position_to_id[to_pos])
+    
+        status(f"✅ Inserted {len(inserted_claims)} claims + {len(claim_output.dependency_pairs)} dependency edges")
 
     # ── Step 6: Process each claim ────────────────────────────────────────────
     resume = _get_pending_claim_ids(conn, paper_id)

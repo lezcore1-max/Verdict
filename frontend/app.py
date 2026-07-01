@@ -242,7 +242,9 @@ st.markdown("""
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _launch_pipeline(
+    input_mode: str,
     uploaded_file,
+    manual_claims: list,
     gemini_key: str,
     tavily_key: str,
     model_name: str,
@@ -253,8 +255,11 @@ def _launch_pipeline(
 ) -> None:
     """Save PDF, set env vars, launch background thread."""
     # ── Defensive guards (Streamlit can fire disabled buttons on rapid reruns) ──
-    if uploaded_file is None:
+    if input_mode == "Upload PDF" and uploaded_file is None:
         st.sidebar.error("Please upload a PDF file first.")
+        return
+    if input_mode == "Direct Claims" and not any(c.get("text", "").strip() for c in manual_claims):
+        st.sidebar.error("Please enter at least one claim.")
         return
     if not gemini_key or not gemini_key.strip():
         st.sidebar.error("Gemini API key is required.")
@@ -269,10 +274,16 @@ def _launch_pipeline(
     os.environ["TAVILY_QUERY_CAP"] = str(tavily_cap)
 
     db_dir = os.path.dirname(_get_db_path())
-    pdf_path = os.path.join(db_dir, uploaded_file.name)
     os.makedirs(db_dir, exist_ok=True)
-    with open(pdf_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
+    
+    if input_mode == "Upload PDF":
+        pdf_path = os.path.join(db_dir, uploaded_file.name)
+        with open(pdf_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+    else:
+        # Dummy path for manual claims
+        import time
+        pdf_path = os.path.join(db_dir, f"manual_claims_{int(time.time())}.txt")
 
     st.session_state["pdf_path"] = pdf_path
     if "status_messages" not in st.session_state:
@@ -301,7 +312,7 @@ def _launch_pipeline(
 
     thread = threading.Thread(
         target=_run_paper_thread,
-        args=(pdf_path, db_path, model_name, gemini_key, tavily_key, _status_cb, status_list),
+        args=(input_mode, manual_claims, pdf_path, db_path, model_name, gemini_key, tavily_key, _status_cb, status_list),
         daemon=True,
         name=f"verdict-paper-{paper_id}",
     )
@@ -311,6 +322,8 @@ def _launch_pipeline(
 
 
 def _run_paper_thread(
+    input_mode: str,
+    manual_claims: list,
     pdf_path: str,
     db_path: str,
     model_name: str,
@@ -323,6 +336,8 @@ def _run_paper_thread(
     try:
         from orchestration.paper_runner import run_paper
         run_paper(
+            input_mode=input_mode,
+            manual_claims=manual_claims,
             pdf_path=pdf_path,
             db_path=db_path,
             model_name=model_name,
@@ -345,12 +360,33 @@ with st.sidebar:
     st.markdown("## ⚙️ Configuration")
     st.markdown("<hr class='verdict-hr'>", unsafe_allow_html=True)
 
-    # PDF upload
-    uploaded_file = st.file_uploader(
-        "📄 Upload Research Paper (PDF)",
-        type=["pdf"],
-        key="pdf_uploader",
-    )
+    input_mode = st.radio("Input Mode", ["Upload PDF", "Direct Claims"], horizontal=True)
+    st.markdown("<hr class='verdict-hr'>", unsafe_allow_html=True)
+    
+    if input_mode == "Upload PDF":
+        uploaded_file = st.file_uploader(
+            "📄 Upload Research Paper (PDF)",
+            type=["pdf"],
+            key="pdf_uploader",
+        )
+        manual_claims = []
+    else:
+        uploaded_file = None
+        if "manual_claims" not in st.session_state:
+            st.session_state["manual_claims"] = [{"text": "", "type": "empirical"}]
+            
+        st.markdown("### Manual Claims")
+        for i, c in enumerate(st.session_state["manual_claims"]):
+            st.markdown(f"**Claim {i+1}**")
+            c["text"] = st.text_area(f"Claim Text", value=c["text"], key=f"claim_text_{i}", height=80, label_visibility="collapsed")
+            c["type"] = st.selectbox(f"Claim Type", ["empirical", "theoretical", "methodological"], index=["empirical", "theoretical", "methodological"].index(c["type"]), key=f"claim_type_{i}", label_visibility="collapsed")
+            st.markdown("<hr style='margin: 0.5rem 0; border-color: rgba(99,179,237,0.1)'>", unsafe_allow_html=True)
+            
+        if st.button("➕ Add Another Claim", use_container_width=True):
+            st.session_state["manual_claims"].append({"text": "", "type": "empirical"})
+            st.rerun()
+            
+        manual_claims = st.session_state["manual_claims"]
 
     st.markdown("<hr class='verdict-hr'>", unsafe_allow_html=True)
     st.markdown("### 🔑 API Keys")
@@ -412,7 +448,11 @@ with st.sidebar:
 
     # Run button
     is_running = "runner_thread" in st.session_state and st.session_state["runner_thread"].is_alive()
-    run_disabled = is_running or uploaded_file is None or not gemini_key
+    if input_mode == "Upload PDF":
+        run_disabled = is_running or uploaded_file is None or not gemini_key
+    else:
+        valid_claims = any(c.get("text", "").strip() for c in manual_claims)
+        run_disabled = is_running or not valid_claims or not gemini_key
 
     if st.button(
         "🚀 Run VERDICT" if not is_running else "⏳ Pipeline Running...",
@@ -421,7 +461,7 @@ with st.sidebar:
         use_container_width=True,
         type="primary",
     ):
-        _launch_pipeline(uploaded_file, gemini_key, tavily_key, global_model,
+        _launch_pipeline(input_mode, uploaded_file, manual_claims, gemini_key, tavily_key, global_model,
                         decomposer_model, synthesizer_model, embed_model, tavily_cap)
 
     if is_running:
