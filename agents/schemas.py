@@ -72,6 +72,14 @@ class SubHypothesis(BaseModel):
     )
     position: int = Field(default=0, ge=0)
 
+    @model_validator(mode="before")
+    @classmethod
+    def handle_text_alias(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            if "text" not in data and "hypothesis" in data:
+                data["text"] = data["hypothesis"]
+        return data
+
 
 class HypothesisDecompOutput(BaseModel):
     sub_hypotheses: list[SubHypothesis] = Field(
