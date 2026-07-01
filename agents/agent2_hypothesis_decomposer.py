@@ -21,7 +21,7 @@ Rules:
 2. Each sub-hypothesis must be independently testable with external evidence.
 3. Sub-hypotheses must be INDEPENDENT of each other.
 4. State the logical_relationship explicitly for each (e.g., "necessary condition", "independent supporting condition").
-5. Do NOT reference "the paper" or "the authors". However, you MUST retain the specific dataset, benchmark, metric, and domain scope (e.g., TopoBench, D3 regime) in every sub-hypothesis. If the claim mentions "evaluated models", you MUST explicitly scope the sub-hypothesis to "the models evaluated in the primary source document" to prevent it from being interpreted as a universal claim about all models ever created.
+5. Do NOT reference "the paper" or "the authors". However, you MUST retain the specific dataset, benchmark, metric, and domain scope (e.g., TopoBench, D3 regime) in every sub-hypothesis. {scope_instruction}
 6. Output 2 to 3 sub-hypotheses maximum.
 
 CLAIM INTERPRETATION RULE:
@@ -42,6 +42,7 @@ Respond ONLY with a valid JSON object. No markdown fences, no explanation, no pr
 def run(
     claim_text: str,
     claim_type: str,
+    has_paper: bool = False,
     model_name: str = DECOMPOSER_MODEL,
     api_key: Optional[str] = None,
 ) -> Optional[HypothesisDecompOutput]:
@@ -51,6 +52,7 @@ def run(
     Args:
         claim_text:  The bare claim text. NO paper context.
         claim_type:  The claim type tag (e.g., "benchmark_performance").
+        has_paper:   Whether a paper source document exists.
         model_name:  Gemini model to use (DECOMPOSER_MODEL by default).
         api_key:     Optional override for GEMINI_API_KEY.
 
@@ -64,10 +66,17 @@ def run(
     # This comment serves as the explicit documentation of the invariant.
     # ────────────────────────────────────────────────────────────────────────
 
+    if has_paper:
+        scope_instruction = 'If the claim mentions "evaluated models", you MUST explicitly scope the sub-hypothesis to "the models evaluated in the primary source document" to prevent it from being interpreted as a universal claim.'
+    else:
+        scope_instruction = 'Do not over-generalize the claim into a generic machine learning statement if it was about a specific evaluation.'
+        
+    system_prompt = _SYSTEM_PROMPT.format(scope_instruction=scope_instruction)
+
     client = GeminiClient(
         model_name=model_name,
-        temperature=0.2,
-        system_prompt=_SYSTEM_PROMPT,
+        temperature=0.1,
+        system_prompt=system_prompt,
         api_key=api_key,
     )
 

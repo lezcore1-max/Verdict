@@ -82,9 +82,11 @@ def node_decompose(state: VerdictState) -> VerdictState:
     """Agent 2: decompose claim into sub-hypotheses."""
     _log_ui(state, "Agent 2: Decomposing into sub-hypotheses...")
     import agents.agent2_hypothesis_decomposer as a2
+    has_paper = bool(state.get("paper_id"))
     result = a2.run(
-        claim_text=state["claim_text"],
-        claim_type=state["claim_type"],
+        claim_text=state.get("claim_text", ""),
+        claim_type=state.get("claim_type", ""),
+        has_paper=has_paper,
         model_name=state.get("model_name", "gemini-2.0-flash"),
         api_key=state.get("api_key"),
     )
