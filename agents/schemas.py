@@ -116,11 +116,13 @@ class JudgedEvidence(BaseModel):
             "Always labelled by p_value_tag."
         ),
     )
-    p_value_tag: Literal["formal", "approximate"] = Field(
+    p_value_tag: Literal["formal", "formal_extracted", "conservative_label", "approximate"] = Field(
         default="approximate",
         description=(
             '"formal" = from scipy.stats.ttest_1samp on PwC leaderboard data. '
-            '"approximate" = LLM-estimated proxy.'
+            '"formal_extracted" = formal scipy test on LLM-extracted numeric data. '
+            '"conservative_label" = fixed p-value mapping from LLM qualitative label. '
+            '"approximate" = Legacy LLM-estimated proxy.'
         ),
     )
     eval_note: Optional[str] = Field(
