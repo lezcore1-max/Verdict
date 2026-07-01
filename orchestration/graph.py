@@ -219,6 +219,7 @@ If a value is not present, use null.""",
         if judged is not None:
             d = judged.model_dump()
             d["agent_source"] = ev_item.agent_source
+            d["reliability_tier"] = ev_item.reliability_tier
             if not judged.directly_tests:
                 d["directness"] = "tangential"
             else:
@@ -285,16 +286,23 @@ def node_run_math(state: VerdictState) -> VerdictState:
             continue
 
         # Extract p-values and tags for SPRT (skip None items and tangential evidence)
-        p_values = [
-            max(float(j["p_value"]), P_VALUE_FLOOR)
-            for j in judged_list
-            if j is not None and j.get("directness", "partial_test") != "tangential"
-        ]
-        tags = [
-            j["p_value_tag"]
-            for j in judged_list
-            if j is not None and j.get("directness", "partial_test") != "tangential"
-        ]
+        # ONLY contradicting evidence should drive the product UP (falsify).
+        # Supporting evidence should have its p-value inverted so it drives the product DOWN (fails to falsify).
+        p_values = []
+        tags = []
+        for j in judged_list:
+            if j is not None and j.get("directness", "partial_test") != "tangential":
+                raw_p = max(float(j["p_value"]), P_VALUE_FLOOR)
+                if j["directionality"] == "supporting":
+                    sprt_p = 1.0 - raw_p
+                else:
+                    sprt_p = raw_p
+                
+                # Ensure sprt_p is strictly bounded
+                sprt_p = max(sprt_p, P_VALUE_FLOOR)
+                
+                p_values.append(sprt_p)
+                tags.append(j["p_value_tag"])
 
         # Run SPRT
         alpha = state.get("alpha", 0.05)
@@ -308,6 +316,7 @@ def node_run_math(state: VerdictState) -> VerdictState:
                 p_value=max(float(j["p_value"]), P_VALUE_FLOOR),
                 directionality=j["directionality"],
                 directness=j.get("directness", "partial_test"),
+                reliability_tier=j.get("reliability_tier", "blog")
             )
             for j in judged_list if j is not None
         ]

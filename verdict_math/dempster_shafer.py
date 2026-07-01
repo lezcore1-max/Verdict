@@ -36,6 +36,7 @@ def evidence_to_mass(
     p_value: float,
     directionality: str,
     directness: str,
+    reliability_tier: str = "blog",
 ) -> np.ndarray:
     """
     Convert a single judged evidence item into a belief triplet [s, c, u].
@@ -76,8 +77,20 @@ def evidence_to_mass(
 
     triplet = np.array([s, c, u], dtype=np.float64)
     total = triplet.sum()
-    # total == 1.0 by construction; division is defensive against float drift
-    return triplet / total
+    triplet = triplet / total
+    
+    # Apply source-based discounting so no single piece of evidence (especially noisy ones) 
+    # gets 100% certainty (which equates to an infinite weight that ruins combinations).
+    alpha = 0.8  # default for blogs
+    if reliability_tier == "primary_paper":
+        alpha = 0.999
+    elif reliability_tier == "preprint":
+        alpha = 0.95
+    elif reliability_tier == "official_report":
+        alpha = 0.95
+        
+    discounted = alpha * triplet + (1.0 - alpha) * np.array([0.0, 0.0, 1.0], dtype=np.float64)
+    return discounted / discounted.sum()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -21,7 +21,7 @@ Rules:
 2. Each sub-hypothesis must be independently testable with external evidence.
 3. Sub-hypotheses must be INDEPENDENT of each other.
 4. State the logical_relationship explicitly for each (e.g., "necessary condition", "independent supporting condition").
-5. Do NOT reference the original paper, its authors, or specific experimental details. Frame sub-hypotheses as general testable propositions.
+5. Do NOT reference "the paper" or "the authors". However, you MUST retain the specific dataset, benchmark, metric, and domain scope (e.g., TopoBench, D3 regime) in every sub-hypothesis. Do not over-generalize the claim into a generic machine learning statement if it was about a specific evaluation.
 6. Output 2 to 3 sub-hypotheses maximum.
 
 CLAIM INTERPRETATION RULE:
