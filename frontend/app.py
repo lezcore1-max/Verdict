@@ -252,6 +252,8 @@ def _launch_pipeline(
     synthesizer_model: str,
     embed_model: str,
     tavily_cap: int,
+    alpha: float,
+    beta: float,
 ) -> None:
     """Save PDF, set env vars, launch background thread."""
     # ── Defensive guards (Streamlit can fire disabled buttons on rapid reruns) ──
@@ -312,7 +314,7 @@ def _launch_pipeline(
 
     thread = threading.Thread(
         target=_run_paper_thread,
-        args=(input_mode, manual_claims, pdf_path, db_path, model_name, gemini_key, tavily_key, _status_cb, status_list),
+        args=(input_mode, manual_claims, pdf_path, db_path, model_name, gemini_key, tavily_key, _status_cb, status_list, alpha, beta),
         daemon=True,
         name=f"verdict-paper-{paper_id}",
     )
@@ -331,6 +333,8 @@ def _run_paper_thread(
     tavily_key: str,
     status_cb,
     status_list: list,
+    alpha: float,
+    beta: float,
 ) -> None:
     """Thread target — calls run_paper and catches all exceptions."""
     try:
@@ -343,6 +347,8 @@ def _run_paper_thread(
             model_name=model_name,
             api_key=api_key,
             tavily_key=tavily_key,
+            alpha=alpha,
+            beta=beta,
             status_callback=status_cb,
         )
     except Exception as exc:
@@ -444,6 +450,27 @@ with st.sidebar:
         key="tavily_cap_input",
     )
 
+    with st.expander("Advanced SPRT Settings"):
+        st.markdown("<small>Adjust Wald sequential probability thresholds.</small>", unsafe_allow_html=True)
+        alpha_val = st.slider(
+            "Alpha (Type I Error)",
+            min_value=0.01,
+            max_value=0.20,
+            value=0.05,
+            step=0.01,
+            help="Probability of falsely falsifying a true claim. Higher values make falsification easier.",
+            key="alpha_slider"
+        )
+        beta_val = st.slider(
+            "Beta (Type II Error)",
+            min_value=0.01,
+            max_value=0.20,
+            value=0.05,
+            step=0.01,
+            help="Probability of failing to falsify a false claim. Higher values make reaching 'insufficient evidence' easier.",
+            key="beta_slider"
+        )
+
     st.markdown("<hr class='verdict-hr'>", unsafe_allow_html=True)
 
     # Run button
@@ -462,7 +489,7 @@ with st.sidebar:
         type="primary",
     ):
         _launch_pipeline(input_mode, uploaded_file, manual_claims, gemini_key, tavily_key, global_model,
-                        decomposer_model, synthesizer_model, embed_model, tavily_cap)
+                        decomposer_model, synthesizer_model, embed_model, tavily_cap, alpha_val, beta_val)
 
     if is_running:
         st.progress(0.5, text="Pipeline is running...")

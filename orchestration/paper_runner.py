@@ -55,6 +55,8 @@ def run_paper(
     api_key: Optional[str] = None,
     tavily_key: Optional[str] = None,
     chroma_dir: str = CHROMA_DIR,
+    alpha: float = 0.05,
+    beta: float = 0.05,
     status_callback=None,   # optional callable(str) for progress reporting
 ) -> int:
     """
@@ -193,6 +195,8 @@ def run_paper(
                     api_key,
                     tavily_key,
                     chroma_dir,
+                    alpha,
+                    beta,
                 )
             )
             p.start()
@@ -242,6 +246,8 @@ def _run_claim_subprocess(
     api_key: Optional[str],
     tavily_key: Optional[str],
     chroma_dir: str,
+    alpha: float,
+    beta: float,
 ) -> None:
     """Module-level function so ProcessPoolExecutor can pickle it on Windows."""
     import sys
@@ -260,6 +266,8 @@ def _run_claim_subprocess(
         api_key=api_key,
         tavily_key=tavily_key,
         chroma_dir=chroma_dir,
+        alpha=alpha,
+        beta=beta,
     )
 
 

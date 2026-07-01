@@ -36,6 +36,8 @@ class VerdictState(TypedDict, total=False):
     tavily_key: Optional[str]
     db_path: str
     chroma_dir: str
+    alpha: float
+    beta: float
 
     # Agent 2 output
     sub_hypotheses: list[dict]   # list of SubHypothesis dicts
@@ -251,7 +253,9 @@ def node_run_math(state: VerdictState) -> VerdictState:
         tags = [j["p_value_tag"] for j in judged_list if j is not None]
 
         # Run SPRT
-        sprt_result = run_sprt(p_values, tags)
+        alpha = state.get("alpha", 0.05)
+        beta = state.get("beta", 0.05)
+        sprt_result = run_sprt(p_values, tags, alpha=alpha, beta=beta)
         sprt_per_sub[pos] = sprt_result
 
         # Dempster-Shafer masses from each evidence item

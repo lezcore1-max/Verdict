@@ -27,6 +27,8 @@ def run_claim(
     api_key: Optional[str] = None,
     tavily_key: Optional[str] = None,
     chroma_dir: str = CHROMA_DIR,
+    alpha: float = 0.05,
+    beta: float = 0.05,
 ) -> None:
     """
     Run the full 6-agent pipeline for a single claim.
@@ -77,6 +79,8 @@ def run_claim(
             "disagreement_scores": {},
             "final_verdict": None,
             "error": None,
+            "alpha": alpha,
+            "beta": beta,
         }
 
         final_state = graph.invoke(initial_state)

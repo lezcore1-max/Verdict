@@ -10,7 +10,7 @@ SPRT thresholds:   upper = (1-β)/α = 8.0   → FALSIFIED
 import numpy as np
 from typing import Any
 
-from core.config import UPPER_THRESHOLD, LOWER_THRESHOLD, P_VALUE_FLOOR
+from core.config import P_VALUE_FLOOR
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -37,6 +37,8 @@ def kappa_e_value(p: float) -> float:
 def run_sprt(
     p_values: list[float],
     p_value_tags: list[str] | None = None,
+    alpha: float = 0.05,
+    beta: float = 0.05,
 ) -> dict[str, Any]:
     """
     Run the sequential product test on a list of p-values.
@@ -59,6 +61,9 @@ def run_sprt(
     if p_value_tags is None:
         p_value_tags = ["approximate"] * len(p_values)
 
+    upper_threshold = (1.0 - beta) / alpha
+    lower_threshold = beta / (1.0 - alpha)
+
     product = np.float64(1.0)   # NumPy float to make intermediate precision explicit
     step_log: list[dict] = []
 
@@ -75,13 +80,13 @@ def run_sprt(
         step_log.append(step)
 
         # Check stopping boundaries after each multiplication
-        if float(product) >= UPPER_THRESHOLD:
+        if float(product) >= upper_threshold:
             return {
                 "step_log": step_log,
                 "product": float(product),
                 "decision": "FALSIFIED",
             }
-        if float(product) <= LOWER_THRESHOLD:
+        if float(product) <= lower_threshold:
             return {
                 "step_log": step_log,
                 "product": float(product),
