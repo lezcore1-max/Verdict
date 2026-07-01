@@ -47,7 +47,7 @@ Respond ONLY with a valid JSON object. No markdown fences, no explanation, no pr
 _EXTRACTOR_SYSTEM_PROMPT = """You are a statistical data extractor. Given a sub-hypothesis and an evidence text, find any exact numeric scores, counts, percentages, or metrics that test the sub-hypothesis.
 
 Determine the 'test_type' based on the numbers you find:
-- "one_sample_proportion": if the evidence gives a count and total (e.g. "solved 4 out of 20").
+- "one_sample_proportion": if the evidence gives a count and total (e.g. "solved 4 out of 20"). Note: If the evidence gives a percentage AND a sample size, prefer "one_sample_proportion" over "single_score_vs_claim" so the real N is used.
 - "one_sample_mean": if the evidence gives multiple run scores (e.g., "[85.2, 86.1, 84.9]") compared to a threshold.
 - "two_sample_ind": if the evidence gives scores for two different models/groups to compare.
 - "single_score_vs_claim": if the evidence gives a single score (e.g. "model X achieved 87.3%") and the claim states a specific threshold.
@@ -135,10 +135,12 @@ def _extract_numbers_and_compute_pvalue(
             
             # Use binomtest (newer scipy API)
             try:
+                # Scipy >= 1.7.0 uses binomtest which returns an object.
+                # In Scipy >= 1.14.0, binom_test is completely removed, so this try block is required.
                 res = scipy_stats.binomtest(count, total, p=expected)
                 p_val = float(res.pvalue)
             except AttributeError:
-                # Fallback for older scipy versions
+                # Fallback for older scipy versions (Scipy < 1.7.0)
                 res = scipy_stats.binom_test(count, total, p=expected)
                 p_val = float(res)
             
