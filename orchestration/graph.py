@@ -54,6 +54,9 @@ class VerdictState(TypedDict, total=False):
 
     # Agent 6 output
     final_verdict: Optional[dict]
+    claim_ds: Optional[dict]
+    claim_conflict: Optional[bool]
+    cap_info: Optional[str]
 
     # Error tracking
     error: Optional[str]
@@ -303,12 +306,87 @@ def node_run_math(state: VerdictState) -> VerdictState:
             "uncertainty": float(final_triplet[2]),
         }
 
+    # -------------------------------------------------------------------------
+    # Compute claim-level DS logic incorporating logical relationships
+    # -------------------------------------------------------------------------
+    sub_hyps = state.get("sub_hypotheses", [])
+    necessary = [sh for sh in sub_hyps if sh.get("logical_relationship") == "necessary condition"]
+    sufficient = [sh for sh in sub_hyps if sh.get("logical_relationship") == "sufficient condition"]
+    supporting = [sh for sh in sub_hyps if sh.get("logical_relationship") not in ("necessary condition", "sufficient condition")]
+
+    if supporting:
+        supporting_masses = [
+            np.array([
+                ds_per_sub[sh["position"]]["support"],
+                ds_per_sub[sh["position"]]["contradiction"],
+                ds_per_sub[sh["position"]]["uncertainty"]
+            ])
+            for sh in supporting if sh["position"] in ds_per_sub
+        ]
+        if supporting_masses:
+            s_sup_arr, _ = combine_all(supporting_masses)
+            s_sup = float(s_sup_arr[0])
+            c_sup = float(s_sup_arr[1])
+        else:
+            s_sup, c_sup = 1.0, 0.0
+    elif sub_hyps:
+        # No supporting, but we have necessary or sufficient conditions
+        s_sup, c_sup = 1.0, 0.0
+    else:
+        # Completely empty claim
+        s_sup, c_sup = 0.0, 0.0
+
+    cap_info_msgs = []
+    final_support = s_sup
+    final_contradiction = c_sup
+
+    # 1. Apply necessary conditions (AND-gate)
+    if necessary:
+        necessary_supports = [ds_per_sub[sh["position"]]["support"] for sh in necessary if sh["position"] in ds_per_sub]
+        necessary_contras = [ds_per_sub[sh["position"]]["contradiction"] for sh in necessary if sh["position"] in ds_per_sub]
+
+        if necessary_supports:
+            min_support = min(necessary_supports)
+            # Find which one caused it for cap_info
+            min_sh = next(sh for sh in necessary if ds_per_sub.get(sh["position"], {}).get("support") == min_support)
+            necessary_factor = min_support
+            
+            final_support = s_sup * necessary_factor
+            if necessary_factor < 0.99:
+                cap_info_msgs.append(f"Sub-hypothesis '{min_sh['text']}' is a necessary condition and capped claim support at {necessary_factor*100:.1f}%.")
+            
+        if necessary_contras:
+            max_contra = max(necessary_contras)
+            if max_contra > c_sup:
+                max_sh = next(sh for sh in necessary if ds_per_sub.get(sh["position"], {}).get("contradiction") == max_contra)
+                cap_info_msgs.append(f"Sub-hypothesis '{max_sh['text']}' is a necessary condition and increased claim contradiction to {max_contra*100:.1f}%.")
+            final_contradiction = max(c_sup, max_contra)
+
+    # 2. Apply sufficient conditions (OR-gate)
+    if sufficient:
+        sufficient_supports = [ds_per_sub[sh["position"]]["support"] for sh in sufficient if sh["position"] in ds_per_sub]
+        if sufficient_supports:
+            max_suff = max(sufficient_supports)
+            if max_suff > final_support:
+                suff_sh = next(sh for sh in sufficient if ds_per_sub.get(sh["position"], {}).get("support") == max_suff)
+                cap_info_msgs.append(f"Sub-hypothesis '{suff_sh['text']}' is a sufficient condition and boosted claim support to {max_suff*100:.1f}%.")
+                final_support = max_suff
+
+    final_uncertainty = max(0.0, 1.0 - final_support - final_contradiction)
+    cap_info_str = " ".join(cap_info_msgs)
+
+    # Calculate claim-level conflict
+    any_conflict = any(conflict_flags.values()) if conflict_flags else False
+
     return {
         **state,
         "sprt_per_sub": sprt_per_sub,
         "ds_per_sub": ds_per_sub,
         "conflict_flags": conflict_flags,
         "disagreement_scores": disagreement_scores,
+        "claim_ds": {"support": final_support, "contradiction": final_contradiction, "uncertainty": final_uncertainty},
+        "claim_conflict": any_conflict,
+        "cap_info": cap_info_str,
     }
 
 
@@ -338,6 +416,7 @@ def node_synthesize(state: VerdictState) -> VerdictState:
         ds_masses=ds_list,
         conflict_flags=flags_list,
         disagreement_score=disagreement_score,
+        cap_info=state.get("cap_info", ""),
         model_name=state.get("model_name", "gemini-2.0-flash"),
         api_key=state.get("api_key"),
     )

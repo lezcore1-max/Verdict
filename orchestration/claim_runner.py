@@ -180,32 +180,25 @@ def _persist_results(
             )
         db.update_pipeline_state(conn, claim_id, f"sub_{pos}_saved", "done", sub_hyp_id=sh_id)
 
-    # Compute claim-level DS by combining sub-hypothesis DS masses
-    ds_values = [state.get("ds_per_sub", {}).get(sh["position"], {}) for sh in sub_hyps]
-    masses = [
-        np.array([d.get("support", 0), d.get("contradiction", 0), d.get("uncertainty", 1)])
-        for d in ds_values if d
-    ]
-    claim_triplet, claim_conflict = combine_all(masses) if masses else (
-        np.array([0.0, 0.0, 1.0]), False
-    )
+    # -------------------------------------------------------------------------
+    # Claim-level values
+    # -------------------------------------------------------------------------
+    claim_ds = state.get("claim_ds", {"support": 0.0, "contradiction": 0.0, "uncertainty": 1.0})
+    any_conflict = state.get("claim_conflict", False)
+
     avg_disagreement = float(
         np.mean([state.get("disagreement_scores", {}).get(sh["position"], 0.0) for sh in sub_hyps])
         if sub_hyps else 0.0
-    )
-    claim_triplet = add_disagreement(claim_triplet, avg_disagreement)
-    any_conflict = claim_conflict or any(
-        state.get("conflict_flags", {}).get(sh["position"], False) for sh in sub_hyps
     )
 
     # Final verdict (may be from Agent 6 or fallback)
     verdict = state.get("final_verdict") or {}
     plain = verdict.get("plain_language", "Pipeline did not produce a verdict.")
 
-    # Always use the pure Dempster-Shafer math for the scores
-    support = float(claim_triplet[0])
-    contradiction = float(claim_triplet[1])
-    uncertainty = float(claim_triplet[2])
+    # Always use the pure Dempster-Shafer math for the scores (already logically gated)
+    support = float(claim_ds.get("support", 0.0))
+    contradiction = float(claim_ds.get("contradiction", 0.0))
+    uncertainty = float(claim_ds.get("uncertainty", 1.0))
 
     db.save_verdict(
         conn,

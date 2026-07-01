@@ -23,6 +23,7 @@ Your inputs include:
 - Dempster-Shafer belief masses (support, contradiction, uncertainty) per sub-hypothesis
 - Conflict flags (HIGH CONFLICT if triggered)
 - Inter-agent disagreement score
+- Any logical condition caps (e.g., necessary conditions limiting support)
 
 Synthesise a final plain-language explanation of the verdict.
 
@@ -49,6 +50,7 @@ def run(
     ds_masses: list[dict],
     conflict_flags: list[bool],
     disagreement_score: float,
+    cap_info: str = "",
     model_name: str = SYNTHESIZER_MODEL,
     api_key: Optional[str] = None,
 ) -> Optional[ClaimVerdict]:
@@ -62,6 +64,7 @@ def run(
         ds_masses:           List of per-sub-hypothesis DS mass dicts.
         conflict_flags:      List of bool conflict flags per sub-hypothesis.
         disagreement_score:  Float — variance between Agent 4 and Agent 5 p-values.
+        cap_info:            String detailing any necessary condition logic gates applied.
         model_name:          Gemini model (SYNTHESIZER_MODEL by default).
         api_key:             Optional API key override.
 
@@ -92,7 +95,8 @@ def run(
 
     prompt = (
         f"Claim: {claim_text}\n\n"
-        f"Inter-agent disagreement score: {disagreement_score:.4f}\n\n"
+        f"Inter-agent disagreement score: {disagreement_score:.4f}\n"
+        f"Logical Condition Caps: {cap_info if cap_info else 'None'}\n\n"
         f"Sub-hypothesis verdicts:\n{_format_sub_verdicts(sub_hyp_context)}\n\n"
         "Synthesise the final verdict for this claim."
     )
