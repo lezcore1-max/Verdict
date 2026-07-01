@@ -153,6 +153,7 @@ def _persist_results(
                 directionality=judged.get("directionality"),
                 agent_source=ev.get("agent_source", "agent3"),
                 raw_content=ev.get("raw_content", ""),
+                eval_note=judged.get("eval_note"),
             )
 
         # SPRT

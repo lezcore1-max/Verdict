@@ -79,7 +79,8 @@ CREATE TABLE IF NOT EXISTS evidence (
     p_value_tag     TEXT,
     directionality  TEXT,
     agent_source    TEXT,
-    raw_content     TEXT
+    raw_content     TEXT,
+    eval_note       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sprt_results (
@@ -370,16 +371,17 @@ def insert_evidence(
     directionality: Optional[str],
     agent_source: str,
     raw_content: str,
+    eval_note: Optional[str] = None,
 ) -> int:
     cur = conn.execute(
         """
         INSERT INTO evidence(sub_hyp_id, source, content, reliability_tier,
                              directness, p_value, p_value_tag, directionality,
-                             agent_source, raw_content)
-        VALUES(?,?,?,?,?,?,?,?,?,?)
+                             agent_source, raw_content, eval_note)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?)
         """,
         (sub_hyp_id, source, content, reliability_tier, directness,
-         p_value, p_value_tag, directionality, agent_source, raw_content),
+         p_value, p_value_tag, directionality, agent_source, raw_content, eval_note),
     )
     conn.commit()
     return cur.lastrowid

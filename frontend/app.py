@@ -787,6 +787,8 @@ def _render_claim_card(claim, conn: sqlite3.Connection) -> None:
                                 unsafe_allow_html=True
                             )
                             with st.expander(f"Source: {str(ev['source'] or '')[:60]}", expanded=False):
+                                if ev["eval_note"]:
+                                    st.info(f"**Math Context:** {ev['eval_note']}")
                                 st.markdown(ev["content"] or "—")
 
 
