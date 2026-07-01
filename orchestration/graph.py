@@ -181,7 +181,15 @@ If a value is not present, use null.""",
         )
         try:
             raw = client.call(f"Claim: {claim_text}") or {}
-            claimed_score = raw.get("claimed_score")
+            claimed_score_raw = raw.get("claimed_score")
+            claimed_score = None
+            if claimed_score_raw is not None:
+                try:
+                    claimed_score = float(claimed_score_raw)
+                except (ValueError, TypeError):
+                    logger.warning(f"Failed to parse claimed_score '{claimed_score_raw}' into a float.")
+                    claimed_score = None
+            
             if claimed_score is not None:
                 pwc_leaderboard = get_pwc_leaderboard(
                     task=raw.get("task", ""),

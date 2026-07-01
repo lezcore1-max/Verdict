@@ -258,14 +258,18 @@ def run(
     label = raw.get("qualitative_label", "weak_or_inconclusive")
     p_val, directionality, strength = _label_to_conservative_pvalue(label)
 
-    return JudgedEvidence(
-        directly_tests=raw.get("directly_tests", True),
-        directionality=directionality,
-        strength=strength,
-        p_value=p_val,
-        p_value_tag="conservative_label",
-        eval_note=raw.get("eval_note", f"Assigned conservative p-value based on label: {label}")
-    )
+    try:
+        return JudgedEvidence(
+            directly_tests=bool(raw.get("directly_tests", True)),
+            directionality=directionality,
+            strength=strength,
+            p_value=p_val,
+            p_value_tag="conservative_label",
+            eval_note=str(raw.get("eval_note", f"Assigned conservative p-value based on label: {label}"))
+        )
+    except Exception as exc:
+        logger.warning("Agent 4: JudgedEvidence validation failed: %s", exc)
+        return None
 
 
 def _formal_ttest(

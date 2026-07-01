@@ -70,7 +70,7 @@ class SubHypothesis(BaseModel):
             '"independent supporting condition"'
         ),
     )
-    position: int = Field(..., ge=0)
+    position: int = Field(default=0, ge=0)
 
 
 class HypothesisDecompOutput(BaseModel):
