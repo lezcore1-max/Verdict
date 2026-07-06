@@ -41,8 +41,15 @@ Produce a structured assessment:
 
 You do NOT see the original paper — only the sub-hypothesis and the evidence item.
 
-Respond ONLY with a valid JSON object. No markdown fences, no explanation, no preamble."""
+Return a JSON object with this exact structure — use these exact key names, nothing else:
+{
+  "directly_tests": true,
+  "qualitative_label": "moderate_support",
+  "eval_note": "Brief reasoning here"
+}
+Do not rename any of these three keys or wrap them under a different top-level key.
 
+Respond ONLY with a valid JSON object. No markdown fences, no explanation, no preamble."""
 
 _EXTRACTOR_SYSTEM_PROMPT = """You are a statistical data extractor. Given a sub-hypothesis and an evidence text, find any exact numeric scores, counts, percentages, or metrics that test the sub-hypothesis.
 
