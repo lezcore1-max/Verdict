@@ -22,9 +22,9 @@ try:
     e = kappa_e_value(0.04)
     assert abs(e - 2.5) < 1e-9, f"Expected 2.5, got {e}"
 
-    # p=0.04 three times → product = 2.5^3 = 15.625 → FALSIFIED (>=8.0)
+    # p=0.04 three times → product = 2.5^3 = 15.625 → UNDECIDED (<19.0)
     result = run_sprt([0.04, 0.04, 0.04])
-    assert result["decision"] == "FALSIFIED", f"Expected FALSIFIED, got {result['decision']}"
+    assert result["decision"] == "UNDECIDED", f"Expected UNDECIDED, got {result['decision']}"
     assert abs(result["product"] - 15.625) < 0.001, f"Expected 15.625, got {result['product']}"
 
     # All p=0.5 → e=0.5*0.5^(-0.5)=0.5*1.414=0.707 → product keeps decreasing → INSUFFICIENT
@@ -46,9 +46,10 @@ try:
         compute_disagreement_score, ConflictError
     )
 
-    # evidence_to_mass: supporting, p=0.1 → [0.9, 0.0, 0.1]
+    # evidence_to_mass: supporting, p=0.1 → raw=[0.9, 0.0, 0.1]. 
+    # Applied 'blog' discount (alpha=0.8) → 0.8*[0.9,0,0.1] + 0.2*[0,0,1] = [0.72, 0.0, 0.28]
     m = evidence_to_mass(0.1, "supporting", "direct_test")
-    assert abs(m[0] - 0.9) < 1e-9 and abs(m[1]) < 1e-9 and abs(m[2] - 0.1) < 1e-9, f"Got {m}"
+    assert abs(m[0] - 0.72) < 1e-9 and abs(m[1]) < 1e-9 and abs(m[2] - 0.28) < 1e-9, f"Got {m}"
 
     # tangential → [0,0,1]
     m2 = evidence_to_mass(0.01, "supporting", "tangential")
@@ -76,12 +77,17 @@ try:
     except ConflictError as e:
         pass  # Expected
 
-    # combine_all: conflict halts at last_good
-    _, flag = combine_all([mc, md])
-    assert flag, "Expected conflict_flag=True"
+    # combine_all: conflict halts at MAX_ALLOWED_CONFLICTS (2).
+    # We use mc (95% support) vs md (95% contradiction) -> Conflict 1
+    # Then last_good (still mc) vs mb (95% contradiction) -> Conflict 2
+    # Since we hit 2 conflicts, the flag should be True.
+    mb_conflict = np.array([0.05, 0.95, 0.0])
+    _, flag = combine_all([mc, md, mb_conflict])
+    assert flag, "Expected conflict_flag=True for >= 2 conflicts"
 
-    _, flag_ok = combine_all([ma, mb])
-    assert not flag_ok, "Expected no conflict"
+    # Only 1 conflict (mc vs md) is tolerated and skipped. Flag remains False.
+    _, flag_ok = combine_all([mc, md])
+    assert not flag_ok, "Expected no conflict flag for < 2 conflicts"
 
     # add_disagreement
     triplet = np.array([0.6, 0.2, 0.2])
