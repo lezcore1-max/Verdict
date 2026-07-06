@@ -54,7 +54,7 @@ def ingest_chunks(
     ids = [f"paper_{paper_id}_chunk_{i}" for i in range(len(chunks))]
     metadatas = [{"paper_id": paper_id, "chunk_index": i} for i in range(len(chunks))]
 
-    # ChromaDB upsert silently ignores existing IDs
+    
     collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)
     logger.info("Ingested %d chunks for paper_id=%d", len(chunks), paper_id)
 
