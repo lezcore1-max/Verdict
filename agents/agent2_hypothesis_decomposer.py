@@ -36,6 +36,18 @@ Example of claim drift to AVOID:
 
 You will receive the claim text and its type tag.
 
+Return a JSON object with this exact structure — use these exact key names, nothing else:
+{
+  "sub_hypotheses": [
+    {
+      "text": "The sub-hypothesis text",
+      "logical_relationship": "necessary condition",
+      "position": 0
+    }
+  ]
+}
+Do not wrap this under any other top-level key (e.g. "hypotheses", "decomposition", "results"). Do not rename "text" to "hypothesis", "sub_hypothesis", or "claim". Do not rename "sub_hypotheses" to anything else.
+
 Respond ONLY with a valid JSON object. No markdown fences, no explanation, no preamble."""
 
 
